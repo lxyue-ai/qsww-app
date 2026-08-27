@@ -488,6 +488,18 @@
         <button class="btn gray" id="btnClearAll">清空全部数据</button>
         <input type="file" id="impFile" accept="application/json" style="display:none">
       </div>
+      <div style="margin-top:16px;border-top:1px dashed #ddd;padding-top:14px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+          <b style="font-size:14px;color:var(--red)">☁ GitHub 云同步</b>
+          <span id="abnSyncStatus" style="font-size:13px;color:var(--muted)">未配置</span>
+        </div>
+        <div class="hint" style="margin-bottom:12px">异常申报与溢流记录自动备份到云端（与主程序共用 GitHub 配置），换设备 / 清缓存无需手动导出。仅在「污水厂工作台」或本页配置过 GitHub 同步后才生效。</div>
+        <div class="actions" style="margin-top:0">
+          <button class="btn green" id="btnAbnSync">立即同步</button>
+          <button class="btn ghost" id="btnAbnSyncSet">同步设置</button>
+          <button class="btn gray" id="btnAbnExpAll">导出全部备份</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -552,9 +564,9 @@
 /* ============ 存储 ============ */
 var KEY='qsww_abn_ledger_v1', SETKEY='qsww_abn_settings';
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||[];}catch(e){return [];}}
-function save(d){localStorage.setItem(KEY,JSON.stringify(d));}
+function save(d){localStorage.setItem(KEY,JSON.stringify(d));abnGhSchedulePush();}
 function loadSet(){try{return JSON.parse(localStorage.getItem(SETKEY))||{};}catch(e){return {};}}
-function saveSet(s){localStorage.setItem(SETKEY,JSON.stringify(s));}
+function saveSet(s){localStorage.setItem(SETKEY,JSON.stringify(s));abnGhSchedulePush();}
 function normalizePath(p,folder){
   if(!p)return '';
   p=String(p).trim();
@@ -602,10 +614,97 @@ document.getElementById('hintBase').textContent=settings.baseFolder.split('\\').
 var OV_KEY='qsww_overflow_v1';
 var ov_records=[];
 try{ov_records=JSON.parse(localStorage.getItem(OV_KEY)||'[]');}catch(e){}
-function ov_save(){localStorage.setItem(OV_KEY,JSON.stringify(ov_records));}
+function ov_save(){localStorage.setItem(OV_KEY,JSON.stringify(ov_records));abnGhSchedulePush();}
 if(!settings.overflowBase)settings.overflowBase='E:\\工作台\\溢流报告';
 document.getElementById('hintOvBase').textContent=settings.overflowBase.split('\\').pop();
 document.getElementById('setOvBase').value=settings.overflowBase;
+
+/* ============ GitHub 云同步（异常申报 + 溢流，复用主程序 wb_qsww_gh 配置） ============ */
+var ABN_GH_PATH='qsww_abn_overflow.json';
+function abnGhConf(){try{return JSON.parse(localStorage.getItem('wb_qsww_gh')||'null');}catch(e){return null;}}
+function abnGhEnabled(){var c=abnGhConf();return !!(c&&c.user&&c.repo&&c.token);}
+function abnGhBase(){var c=abnGhConf();return 'https://api.github.com/repos/'+encodeURIComponent(c.user)+'/'+encodeURIComponent(c.repo)+'/contents/'+encodeURIComponent(ABN_GH_PATH);}
+function abnGhHeaders(){var c=abnGhConf();return {'Accept':'application/vnd.github+json','Authorization':'Bearer '+c.token,'X-GitHub-Api-Version':'2022-11-28'};}
+function abnB64enc(s){return btoa(unescape(encodeURIComponent(s)));}
+function abnB64dec(s){return decodeURIComponent(escape(atob(s.replace(/\s/g,''))));}
+function abnBuildPayload(){return {records:records,ov_records:ov_records,meta:{updatedAt:Date.now()}};}
+function abnMerge(remote){
+  if(!remote||typeof remote!=='object')return;
+  if(Array.isArray(remote.records)){var m={};records.forEach(function(r){if(r&&r.id)m[r.id]=r;});remote.records.forEach(function(r){if(r&&r.id)m[r.id]=r;});records=Object.keys(m).map(function(id){return m[id];});}
+  if(Array.isArray(remote.ov_records)){var om={};ov_records.forEach(function(r){if(r&&r.id)om[r.id]=r;});remote.ov_records.forEach(function(r){if(r&&r.id)om[r.id]=r;});ov_records=Object.keys(om).map(function(id){return om[id];});}
+  save(records);ov_save();
+}
+async function abnGhPush(){
+  if(!abnGhEnabled())return;
+  abnSyncUI('ing');
+  try{
+    var c=abnGhConf(),sha=null;
+    try{var g=await fetch(abnGhBase()+(c.branch&&c.branch!=='main'?'?ref='+encodeURIComponent(c.branch):''),{headers:abnGhHeaders()});if(g.ok){var j=await g.json();sha=j.sha;try{var remote=JSON.parse(abnB64dec(j.content));abnMerge(remote);}catch(e){}}}catch(e){}
+    var payload={records:records,ov_records:ov_records,meta:{updatedAt:Date.now()}};
+    var content=abnB64enc(JSON.stringify(payload));
+    var body={message:'sync abn/overflow '+new Date().toISOString(),content:content,branch:c.branch||'main'};
+    if(sha)body.sha=sha;
+    var r=await fetch(abnGhBase(),{method:'PUT',headers:Object.assign({},abnGhHeaders(),{'Content-Type':'application/json'}),body:JSON.stringify(body)});
+    if(!r.ok){var e=await r.json().catch(function(){return {};});throw new Error(e.message||('HTTP '+r.status));}
+    abnSyncUI('ok');
+  }catch(e){console.warn('abnGhPush',e);abnSyncUI('err',e.message);throw e;}
+}
+async function abnGhPull(){
+  if(!abnGhEnabled())return;
+  abnSyncUI('ing');
+  try{
+    var c=abnGhConf();
+    var url=abnGhBase()+(c.branch&&c.branch!=='main'?'?ref='+encodeURIComponent(c.branch):'');
+    var r=await fetch(url,{headers:abnGhHeaders()});
+    if(r.status===404){abnSyncUI('ok');return;}
+    if(!r.ok){var e=await r.json().catch(function(){return {};});throw new Error(e.message||('HTTP '+r.status));}
+    var j=await r.json();
+    var remote=JSON.parse(abnB64dec(j.content));
+    var before=records.length+ov_records.length;
+    abnMerge(remote);
+    var after=records.length+ov_records.length;
+    if(after>before)toast('已从云端合并 '+(after-before)+' 条记录');
+    abnSyncUI('ok');renderList();renderStat();ov_renderList();ov_renderStat();
+  }catch(e){console.warn('abnGhPull',e);abnSyncUI('err',e.message);}
+}
+function abnSyncUI(state,msg){
+  var el=document.getElementById('abnSyncStatus');if(!el)return;
+  if(state==='ok'){el.innerHTML='<span style="color:var(--green)">✓ 已同步</span> '+(new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}));}
+  else if(state==='ing'){el.innerHTML='<span style="color:var(--blue)">⟳ 同步中…</span>';}
+  else if(state==='err'){el.innerHTML='<span style="color:var(--red)">✗ 同步失败</span>';if(msg)toast('同步失败：'+msg);}
+  else {el.innerHTML='<span style="color:var(--muted)">未配置</span>';}
+}
+var __abn_ght=null,__abn_pt=null;
+function abnGhSchedulePush(){
+  if(!abnGhEnabled())return;
+  if(__abn_pt)clearTimeout(__abn_pt);
+  __abn_pt=setTimeout(function(){abnGhPush().catch(function(){});},1500);
+}
+function abnGhStartAuto(){
+  if(!abnGhEnabled()){abnSyncUI();return;}
+  abnSyncUI('ok');abnGhPull().catch(function(){});
+  if(__abn_ght)clearInterval(__abn_ght);
+  __abn_ght=setInterval(function(){if(abnGhEnabled())abnGhPull().catch(function(){});},60000);
+  window.addEventListener('focus',function(){if(abnGhEnabled())abnGhPull().catch(function(){});});
+  window.addEventListener('online',function(){if(abnGhEnabled()){abnGhPull().catch(function(){});abnGhPush().catch(function(){});}});
+}
+function abnGhOpen(){
+  var c=abnGhConf()||{};
+  document.getElementById('abn_gh_user').value=c.user||'';
+  document.getElementById('abn_gh_repo').value=c.repo||'';
+  document.getElementById('abn_gh_branch').value=c.branch||'main';
+  document.getElementById('abn_gh_token').value=c.token||'';
+  document.getElementById('abn_gh_test').textContent='';
+  document.getElementById('abnGhModal').classList.add('show');
+}
+function abnGhClose(){document.getElementById('abnGhModal').classList.remove('show');}
+function abnGhSave(){
+  var nc={user:(document.getElementById('abn_gh_user').value||'').trim(),repo:(document.getElementById('abn_gh_repo').value||'').trim(),branch:(document.getElementById('abn_gh_branch').value||'').trim()||'main',token:(document.getElementById('abn_gh_token').value||'').trim()};
+  if(!nc.user||!nc.repo||!nc.token){toast('请填完用户名、仓库、令牌');return;}
+  localStorage.setItem('wb_qsww_gh',JSON.stringify(nc));
+  document.getElementById('abn_gh_test').textContent='连接测试中…';
+  abnGhPull().then(function(){return abnGhPush();}).then(function(){document.getElementById('abn_gh_test').textContent='连接成功，已自动同步。';toast('GitHub 同步已开启');abnGhStartAuto();}).catch(function(e){abnSyncUI('err',e&&e.message||e);document.getElementById('abn_gh_test').textContent='失败：'+(e&&e.message||e);});
+}
 
 /* ============ 工具 ============ */
 function uid(){return 'a'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
@@ -1720,6 +1819,19 @@ function openOvDoc(r){
 
 /* 初始 */
 renderList();
+
+/* GitHub 云同步：按钮绑定与自动启动 */
+document.getElementById('btnAbnSync').onclick=function(){
+  if(!abnGhEnabled()){toast('请先点「同步设置」配置 GitHub');abnGhOpen();return;}
+  abnGhPull().then(function(){return abnGhPush();}).then(function(){toast('已同步');}).catch(function(e){toast('同步失败：'+(e&&e.message||e));});
+};
+document.getElementById('btnAbnSyncSet').onclick=abnGhOpen;
+document.getElementById('btnAbnExpAll').onclick=function(){
+  var data={records:records,ov_records:ov_records,settings:settings};
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='异常申报溢流全部备份_'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('已导出全部备份');
+};
+abnGhStartAuto();
 </script>
 
 <div class="img-modal" id="imgModal" onclick="if(event.target===this)closeImgModal()">
@@ -1728,6 +1840,22 @@ renderList();
   <img id="imgPreview" src="" alt="预览" onclick="event.stopPropagation()">
   <div class="err" id="imgErr" onclick="event.stopPropagation()"></div>
   <div class="tip" id="imgTip"></div>
+</div>
+
+<div class="path-modal" id="abnGhModal" style="z-index:300">
+  <div class="box" style="max-width:480px">
+    <h3>GitHub 云同步设置</h3>
+    <div class="hint" style="margin-top:0">与主程序（污水厂工作台）共用同一 GitHub 配置，填一次即可。用于自动同步异常申报与溢流记录。</div>
+    <div class="field"><label>GitHub 用户名<span class="req">*</span></label><input id="abn_gh_user" placeholder="如 lxyue-ai"></div>
+    <div class="field"><label>仓库名<span class="req">*</span></label><input id="abn_gh_repo" placeholder="qsww-sync"></div>
+    <div class="field"><label>分支<span class="req">*</span></label><input id="abn_gh_branch" placeholder="main"></div>
+    <div class="field"><label>个人访问令牌 Token<span class="req">*</span></label><input id="abn_gh_token" type="password" placeholder="ghp_..."></div>
+    <div id="abn_gh_test" style="font-size:13px;margin:8px 0;color:#666"></div>
+    <div class="actions" style="justify-content:flex-end;margin-top:8px">
+      <button class="btn ghost" onclick="abnGhClose()">取消</button>
+      <button class="btn blue" onclick="abnGhSave()">保存并测试</button>
+    </div>
+  </div>
 </div>
 </body>
 </html>
