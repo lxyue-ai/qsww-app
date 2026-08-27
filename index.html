@@ -601,6 +601,9 @@ function load(){try{var s=localStorage.getItem(KEY);DB=s?JSON.parse(s):blank();}
 function save(suppressPush){try{localStorage.setItem(KEY,JSON.stringify(DB));}catch(e){toast('存储空间不足，请导出备份后删除部分图片');}
   if(!suppressPush&&ghEnabled()){if(ghTimer)clearTimeout(ghTimer);ghTimer=setTimeout(ghPush,1000);}
 }
+/* 异常申报/溢流已拆分为独立模块，index.html 需直接读取其 localStorage key */
+function getAbnRecords(){try{return JSON.parse(localStorage.getItem('qsww_abn_ledger_v1')||'[]');}catch(e){return [];}}
+function getOvRecords(){try{return JSON.parse(localStorage.getItem('qsww_overflow_v1')||'[]');}catch(e){return [];}}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function yesterdayStr(){var d=new Date();d.setDate(d.getDate()-1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -678,6 +681,8 @@ function collectMonths(){
   var set={};
   ['water','production','chemical','abnormal','overflow'].forEach(function(c){(DB.ledgers[c]||[]).forEach(function(r){var d=r.date||r.month||'';if(d.length>=7)set[d.slice(0,7)]=1;});});
   DB.reports.forEach(function(r){if((r.date||'').length>=7)set[r.date.slice(0,7)]=1;});
+  getAbnRecords().forEach(function(r){if((r.date||'').length>=7)set[r.date.slice(0,7)]=1;});
+  getOvRecords().forEach(function(r){if((r.date||'').length>=7)set[r.date.slice(0,7)]=1;});
   var arr=Object.keys(set);arr.sort();return arr;
 }
 function fillDashSel(){
@@ -744,8 +749,8 @@ function renderHome(){
   var mp=DB.ledgers.production.filter(function(r){return inRange(r.date,a,b);});
   var chem=DB.ledgers.chemical.filter(function(r){return inRange(r.date,a,b);});
   var rep=DB.reports.filter(function(r){return inRange(r.date,a,b);}).length;
-  var abn=DB.ledgers.abnormal.filter(function(r){return inRange(r.date,a,b);}).length;
-  var ofl=DB.ledgers.overflow.filter(function(r){return inRange(r.date,a,b);}).length;
+  var abn=getAbnRecords().filter(function(r){return inRange(r.date,a,b);}).length;
+  var ofl=getOvRecords().filter(function(r){return inRange(r.date,a,b);}).length;
   var cards=[
     {k:prefix+'进水量',v:fmt(tin)+' m³'},
     {k:prefix+'出水量',v:fmt(tout)+' m³'},
@@ -1752,7 +1757,7 @@ function schedData(ym){
     if(mon.outTp!=null)pols.outTp.push(num(mon.outTp));
   }
   function avg(arr){return arr.length?Math.round(arr.reduce(function(a,b){return a+b;},0)/arr.length*100)/100:'';}
-  var abnormalMarks=monthRows('abnormal',ym).length;
+  var abnormalMarks=getAbnRecords().filter(function(r){return (r.date||'').slice(0,7)===ym;}).length;
   return {
     ym:ym,y:y,m:m,daysInMonth:daysInMonth,
     sumIn:sumIn,sumOut:sumOut,inDays:inDays,outDays:outDays,
