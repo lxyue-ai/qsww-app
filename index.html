@@ -16,19 +16,23 @@ button{font-family:inherit;cursor:pointer;border:none}
 input,select,textarea{font-family:inherit;font-size:16px;border:1px solid var(--border);border-radius:8px;padding:9px 12px;width:100%;background:#fff;color:var(--text)}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);outline-offset:-1px}
 svg.ic{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
-.layout{display:flex;max-width:1180px;margin:0 auto;min-height:100vh}
-.sidebar{width:196px;flex:none;padding:20px 12px;position:sticky;top:0;height:100vh;overflow:auto}
-.main{flex:1;padding:20px 20px 90px;min-width:0}
-.logo{display:flex;align-items:center;gap:10px;padding:6px 10px 18px}
-.logo .mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--blue),#6db3f2);display:flex;align-items:center;justify-content:center}
-.logo .mark svg{width:20px;height:20px;stroke:#fff}
-.logo b{font-size:16px}
-.nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:11px 14px;margin-bottom:4px;border-radius:10px;background:transparent;color:var(--muted);font-size:15px;text-align:left}
-.nav-item.active{background:var(--blue);color:#fff;font-weight:600;box-shadow:0 4px 12px rgba(47,127,214,.25)}
-.nav-item:not(.active):hover{background:var(--blue-l)}
-.nav-group{margin-top:14px}
-.nav-group:first-of-type{margin-top:2px}
-.nav-gl{font-size:11px;font-weight:700;color:#9bb2cc;letter-spacing:1.5px;padding:2px 14px 6px}
+/* ===== 顶部导航布局 ===== */
+.layout{max-width:1180px;margin:0 auto;min-height:100vh;padding-top:0}
+.main{padding:16px 16px 90px;min-width:0}
+.topbar{position:sticky;top:0;z-index:90;background:#fff;border-bottom:1px solid var(--border);
+  box-shadow:0 2px 10px rgba(47,127,214,.08);padding:10px 16px 8px}
+.topbar-inner{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.topbar .brand{display:flex;align-items:center;gap:9px;margin-right:6px}
+.topbar .brand .mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--blue),#6db3f2);display:flex;align-items:center;justify-content:center}
+.topbar .brand .mark svg{width:19px;height:19px;stroke:#fff}
+.topbar .brand b{font-size:15px;color:var(--text)}
+.topbar .nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1}
+.topbar .nav-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.topbar .nav-gl{display:none}
+.nav-item{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:20px;background:transparent;color:var(--muted);font-size:14px;white-space:nowrap;border:1px solid transparent}
+.nav-item:hover{background:var(--blue-l)}
+.nav-item.active{background:var(--blue);color:#fff;font-weight:600;box-shadow:0 4px 12px rgba(47,127,214,.25);border-color:var(--blue)}
+.sidebar{display:none}
 .bottombar{display:none}
 .card{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:18px;margin-bottom:16px}
 .card h2{font-size:17px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
@@ -149,7 +153,8 @@ textarea.fldta{width:100%;min-height:56px;border:1px solid #cfe0f2;border-radius
 .attachbtn{background:var(--blue-l);color:var(--blue-d);border-radius:8px;padding:4px 10px;font-size:12px;min-height:32px}
 .sludge-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}
 @media (max-width:768px){
-  .sidebar{display:none}
+  .topbar{padding:8px 12px}
+  .topbar .nav{display:none}
   .main{padding:14px 14px calc(76px + env(safe-area-inset-bottom))}
   .grid2,.grid3,.grid4{grid-template-columns:1fr}
   .bottombar{display:flex;position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--border);z-index:90;padding-bottom:env(safe-area-inset-bottom);overflow-x:auto;justify-content:flex-start;-webkit-overflow-scrolling:touch}
@@ -159,9 +164,7 @@ textarea.fldta{width:100%;min-height:56px;border:1px solid #cfe0f2;border-radius
 #syncBtn.sync-ok{color:#0a8a3e!important;border-color:#0a8a3e!important}
 #syncBtn.sync-ing{color:#1f6feb!important;border-color:#1f6feb!important}
 #syncBtn.sync-off{color:#c0392b!important;border-color:#c0392b!important}
-  .m-head{display:flex;align-items:center;gap:8px;margin-bottom:14px}
-  .m-head .mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--blue),#6db3f2);display:flex;align-items:center;justify-content:center}
-  .m-head .mark svg{width:18px;height:18px;stroke:#fff}
+  .m-head{display:none}
   table.tb{font-size:13px}
 }
 @media (min-width:769px){.m-head{display:none}}
@@ -190,14 +193,11 @@ body{background:linear-gradient(180deg,#eef4fc 0%,#e7eff9 100%);color:var(--text
 .logo .mark{box-shadow:0 4px 10px rgba(47,127,214,.3)}
 .logo b{letter-spacing:.5px}
 
-/* 侧边栏面板化 */
-.sidebar{background:#fff;border-right:1px solid var(--border);box-shadow:2px 0 14px rgba(31,111,196,.05)}
-.nav-gl{position:relative;padding:10px 14px 6px!important}
-.nav-gl::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
-.nav-item{transition:background .18s,color .18s,transform .12s;border:1px solid transparent}
-.nav-item.active{box-shadow:0 6px 16px rgba(47,127,214,.28);position:relative}
-.nav-item.active::before{content:"";position:absolute;left:6px;top:50%;transform:translateY(-50%);width:4px;height:20px;border-radius:4px;background:#fff}
-.nav-item:not(.active):hover{background:var(--blue-l);transform:translateX(2px)}
+/* 顶栏导航美化 */
+.topbar{background:rgba(255,255,255,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.nav-item{transition:background .18s,color .18s,transform .12s,border-color .18s,box-shadow .18s}
+.nav-item.active{box-shadow:0 6px 16px rgba(47,127,214,.28)}
+.nav-item:not(.active):hover{background:var(--blue-l);transform:translateY(-1px)}
 
 /* 卡片升级 */
 .card{box-shadow:0 6px 20px rgba(31,111,196,.07);border:1px solid rgba(220,232,244,.7);transition:box-shadow .2s}
@@ -243,9 +243,8 @@ table.tb tbody tr:hover{background:var(--blue-xl)}
 /* ============ 平板（769–1024） ============ */
 @media (min-width:769px) and (max-width:1024px){
   .layout{max-width:1000px}
-  .sidebar{width:160px;padding:16px 8px}
-  .sidebar .logo b{font-size:14px}
-  .nav-item{font-size:14px;padding:10px 10px}
+  .topbar .brand b{font-size:14px}
+  .nav-item{font-size:13px;padding:7px 11px}
   .grid4{grid-template-columns:repeat(2,1fr)}
   .grid3{grid-template-columns:repeat(2,1fr)}
 }
@@ -278,37 +277,26 @@ table.tb tbody tr:hover{background:var(--blue-xl)}
   <b>清水县污水厂资料工作台</b>
 </div>
 
-<div class="layout">
-  <aside class="sidebar">
-    <div class="logo">
+<nav class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
       <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7C12 2.7 5 10.5 5 15a7 7 0 0 0 14 0c0-4.5-7-12.3-7-12.3z"/></svg></div>
       <b>资料工作台</b>
     </div>
-    <div class="nav-group">
-      <div class="nav-gl">概览</div>
+    <div class="nav">
       <button class="nav-item active" data-view="home" onclick="go('home')"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>驾驶舱</button>
-    </div>
-    <div class="nav-group">
-      <div class="nav-gl">日常业务</div>
       <button class="nav-item" data-view="report" onclick="go('report')"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13h6M9 17h6"/></svg>每日上报</button>
       <button class="nav-item" data-view="ledger" onclick="go('ledger')"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg>台账中心</button>
       <button class="nav-item" data-view="plat" onclick="go('plat')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>平台上报</button>
-    </div>
-    <div class="nav-group">
-      <div class="nav-gl">报表与资料</div>
       <button class="nav-item" data-view="stats" onclick="go('stats')"><svg class="ic" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>报表中心</button>
-    </div>
-    <div class="nav-group">
-      <div class="nav-gl">污泥管理</div>
       <button class="nav-item" data-view="sludge" onclick="go('sludge')"><svg class="ic" viewBox="0 0 24 24"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M12 12v4"/></svg>污泥管理</button>
-    </div>
-    <div class="nav-group">
-      <div class="nav-gl">专项申报</div>
-      <button class="nav-item" data-view="abn" onclick="go('abn')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 9v5M12 17h.01"/></svg>异常申报台账</button>
+      <button class="nav-item" data-view="abn" onclick="go('abn')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 9v5M12 17h.01"/></svg>异常申报</button>
       <button class="nav-item" data-view="overflow" onclick="go('overflow')"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0z"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>溢流报告</button>
     </div>
-  </aside>
+  </div>
+</nav>
 
+<div class="layout">
   <main class="main">
     <div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px">
       <b style="font-size:16px;flex:1;min-width:200px">清水县城区生活污水处理厂 · 资料工作台</b>
@@ -526,13 +514,13 @@ table.tb tbody tr:hover{background:var(--blue-xl)}
     <!-- ========== 异常申报台账（独立优化模块，iframe 嵌入） ========== -->
     <section class="view" id="view-abn">
       <div class="view-head"><b>异常申报台账</b><span class="muted">在线监控设施异常申报 · 月/季/年统计 · 按原因查找 · 图片直接上传预览</span></div>
-      <iframe src="ledger.html?embed=1&v=20260825a" title="异常申报台账" style="width:100%;height:calc(100vh - 168px);min-height:480px;border:none;border-radius:10px;background:#fff"></iframe>
+      <iframe src="ledger.html?embed=1&v=20260827a" title="异常申报台账" style="width:100%;height:calc(100vh - 168px);min-height:480px;border:none;border-radius:10px;background:#fff"></iframe>
     </section>
 
     <!-- ========== 溢流报告（从异常申报台账独立出来的板块） ========== -->
     <section class="view" id="view-overflow">
       <div class="view-head"><b>溢流报告</b><span class="muted">溢流登记（开/关阀时间·集水井液位·实时进水流量） · 月/季/年统计 · 生成红头文 · 扫描件上传 · 关联电脑文件夹</span></div>
-      <iframe src="ledger.html?embed=1&v=20260825b&focus=overflow" title="溢流报告" style="width:100%;height:calc(100vh - 168px);min-height:480px;border:none;border-radius:10px;background:#fff"></iframe>
+      <iframe src="ledger.html?embed=1&v=20260827b&focus=overflow" title="溢流报告" style="width:100%;height:calc(100vh - 168px);min-height:480px;border:none;border-radius:10px;background:#fff"></iframe>
     </section>
 
     <!-- ========== 污泥管理（从台账中心独立出来的独立模块） ========== -->
