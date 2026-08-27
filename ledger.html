@@ -52,29 +52,41 @@
   header .sub{font-size:12px;opacity:.85;margin-top:2px;}
   header .meta{margin-left:auto;font-size:12px;opacity:.9;text-align:right;line-height:1.6;}
 
-  /* 整体布局：左侧分组菜单 + 右侧内容 */
-  .layout{display:flex;align-items:flex-start;min-height:calc(100vh - 60px);}
-  .side{width:212px;flex:none;background:#fff;border-right:1px solid var(--line);
-    padding:16px 10px;position:sticky;top:0;align-self:flex-start;
-    max-height:calc(100vh - 60px);overflow:auto;}
-  .side-group{margin-bottom:20px;}
-  .side-title{font-size:13px;font-weight:800;color:var(--red);letter-spacing:1px;
-    padding:7px 10px;margin-bottom:6px;border-left:4px solid var(--red);
-    background:var(--bg);border-radius:0 6px 6px 0;}
-  .side button{display:block;width:100%;text-align:left;background:none;border:none;
-    padding:10px 12px;font-size:14px;color:#445;cursor:pointer;border-radius:8px;margin-bottom:3px;}
-  .side button:hover{background:#f4f6f9;}
-  .side button.active{background:var(--red);color:#fff;font-weight:700;}
+  /* ===== 顶部导航（替代左侧菜单，避免横向滑动） ===== */
+  .topnav{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid var(--line);
+    box-shadow:0 2px 6px rgba(0,0,0,.06);padding:8px 16px 7px;}
+  .modbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:7px;}
+  .modpill{display:inline-flex;align-items:center;gap:6px;border:1px solid #dcdcdc;background:#f6f7f9;
+    padding:8px 18px;border-radius:999px;font-size:14px;font-weight:700;color:#555;cursor:pointer;white-space:nowrap;}
+  .modpill:hover{background:#eef0f3;}
+  .modpill.active{background:var(--red);border-color:var(--red);color:#fff;}
+  .subbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .subbar[hidden]{display:none;}
+  .subtab{border:1px solid #e4e4e4;background:#fff;padding:7px 15px;border-radius:8px;font-size:13.5px;color:#555;cursor:pointer;white-space:nowrap;}
+  .subtab:hover{background:#f4f6f9;border-color:#cfd6e0;}
+  .subtab.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700;}
 
-  .wrap{flex:1;min-width:0;padding:0 16px 40px;margin:16px 16px 0;}
+  .wrap{padding:16px 16px 48px;max-width:1120px;margin:0 auto;}
 
-  @media (max-width:860px){
-    .layout{flex-direction:column;}
-    .side{width:100%;position:static;max-height:none;border-right:none;border-bottom:1px solid var(--line);
-      display:flex;gap:10px;overflow-x:auto;padding:10px 12px;align-items:stretch;}
-    .side-group{margin-bottom:0;display:flex;align-items:center;gap:6px;flex:none;}
-    .side-title{border-left:none;background:none;margin:0;padding:0 6px 0 0;white-space:nowrap;}
-    .side button{width:auto;margin-bottom:0;white-space:nowrap;padding:8px 12px;}
+  /* 总览 */
+  .quickgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .quick{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    padding:24px 16px;border:1px solid #ecd2d2;border-radius:12px;background:#fff;color:#9e1b1b;
+    font-size:22px;font-weight:800;cursor:pointer;transition:.12s;}
+  .quick span{font-size:14px;font-weight:700;color:#9e1b1b;}
+  .quick:hover{background:#fff5f5;box-shadow:0 3px 12px rgba(192,0,0,.12);}
+  .home2col{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px;}
+  .home2col .more{margin-top:10px;}
+  .homelist .hi{display:flex;gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px dashed #eee;}
+  .homelist .hi:last-child{border-bottom:none;}
+  .homelist .hd{font-weight:700;color:var(--red);white-space:nowrap;}
+  .homelist .hc{color:#555;font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .homelist .he{color:#999;font-size:12px;white-space:nowrap;}
+  .homelist .empty{color:var(--muted);font-size:13px;padding:14px 0;}
+
+  @media (max-width:720px){
+    .home2col{grid-template-columns:1fr;}
+    .quickgrid{grid-template-columns:1fr;}
   }
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
     padding:18px 20px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
@@ -180,29 +192,55 @@
     <div class="logo">异常申报台账</div>
     <div class="sub">清水县慧泽污水处理厂 · 在线监控设施异常申报与统计分析</div>
   </div>
-  <div class="meta" id="metaBox">数据存于本机浏览器<br>请定期导出备份</div>
+  <div class="meta" id="metaBox">本地存储 · 支持 GitHub 云同步<br>换设备自动恢复</div>
 </header>
 
-<div class="layout">
-<aside class="side noprint">
-  <div class="side-group" id="sideGrpAbn">
-    <div class="side-title">异常申报</div>
-    <button data-tab="entry" class="active">录入异常</button>
-    <button data-tab="list">台账明细</button>
-    <button data-tab="stat">统计分析</button>
-    <button data-tab="search">查找</button>
-    <button data-tab="set">设置</button>
+<div class="topnav noprint" id="topnav">
+  <div class="modbar">
+    <button class="modpill" data-mod="home" id="modHome">🏠 总览</button>
+    <button class="modpill" data-mod="abn" id="modAbn">异常申报</button>
+    <button class="modpill" data-mod="ov" id="modOv">溢流报告</button>
   </div>
-  <div class="side-group" id="sideGrpOv">
-    <div class="side-title">溢流报告</div>
-    <button data-tab="ov_entry">录入溢流</button>
-    <button data-tab="ov_list">台账明细</button>
-    <button data-tab="ov_stat">统计分析</button>
-    <button data-tab="ov_search">查找</button>
+  <div class="subbar" id="subAbn" hidden>
+    <button class="subtab" data-tab="entry">录入异常</button>
+    <button class="subtab" data-tab="list">台账明细</button>
+    <button class="subtab" data-tab="stat">统计分析</button>
+    <button class="subtab" data-tab="search">查找</button>
+    <button class="subtab" data-tab="set">设置</button>
   </div>
-</aside>
+  <div class="subbar" id="subOv" hidden>
+    <button class="subtab" data-tab="ov_entry">录入溢流</button>
+    <button class="subtab" data-tab="ov_list">台账明细</button>
+    <button class="subtab" data-tab="ov_stat">统计分析</button>
+    <button class="subtab" data-tab="ov_search">查找</button>
+  </div>
+</div>
 
 <div class="wrap">
+
+  <!-- ===================== 总览 ===================== -->
+  <section id="tab-home" class="tabsec" style="display:none">
+    <div class="card" style="background:linear-gradient(135deg,#ffffff,#fff6f6);border-color:#f1cfcf">
+      <h3>快捷填报</h3>
+      <div class="quickgrid">
+        <button class="quick" onclick="selectMod('abn');showTab('entry')">📝<span>录入异常申报</span></button>
+        <button class="quick" onclick="selectMod('ov');showTab('ov_entry')">🌊<span>录入溢流记录</span></button>
+      </div>
+    </div>
+    <div class="home2col">
+      <div class="card">
+        <h3>最近异常申报</h3>
+        <div class="homelist" id="homeAbnList"></div>
+        <div class="more"><a href="javascript:void(0)" onclick="selectMod('abn');showTab('list')">查看全部明细 →</a></div>
+      </div>
+      <div class="card">
+        <h3>最近溢流记录</h3>
+        <div class="homelist" id="homeOvList"></div>
+        <div class="more"><a href="javascript:void(0)" onclick="selectMod('ov');showTab('ov_list')">查看全部明细 →</a></div>
+      </div>
+    </div>
+  </section>
+
 
   <!-- ===================== 录入 ===================== -->
   <section id="tab-entry" class="tabsec">
@@ -759,20 +797,65 @@ function renderFiles(v){
   return linksHtml(v);
 }
 
-/* ============ 标签页 ============ */
-var tabs=document.querySelectorAll('.side button[data-tab]');
-function showTab(t){
-  tabs.forEach(function(x){x.classList.remove('active');});
-  var btn=document.querySelector('.side button[data-tab="'+t+'"]');
-  if(btn)btn.classList.add('active');
-  document.querySelectorAll('.tabsec').forEach(function(s){s.style.display='none';});
-  var sec=document.getElementById('tab-'+t);if(sec)sec.style.display='';
-  if(t==='stat')renderStat();
-  if(t==='list')renderList();
-  if(t==='ov_stat')ov_renderStat();
-  if(t==='ov_list')ov_renderList();
+/* ============ 标签页（顶部导航，模块感知） ============ */
+var MOD_ABN=['entry','list','stat','search','set'];
+var MOD_OV=['ov_entry','ov_list','ov_stat','ov_search'];
+var curMod=null;
+function setActive(el,on){ if(el) el.classList.toggle('active', !!on); }
+function showSub(mod){
+  var sa=document.getElementById('subAbn'), so=document.getElementById('subOv');
+  if(sa) sa.hidden=(mod!=='abn');
+  if(so) so.hidden=(mod!=='ov');
 }
-tabs.forEach(function(b){b.onclick=function(){showTab(b.getAttribute('data-tab'));};});
+function showTab(t){
+  document.querySelectorAll('.subtab').forEach(function(x){x.classList.remove('active');});
+  var st=document.querySelector('.subtab[data-tab="'+t+'"]'); if(st) st.classList.add('active');
+  var mod = (MOD_ABN.indexOf(t)>=0)?'abn':(MOD_OV.indexOf(t)>=0)?'ov':'home';
+  setActive(document.querySelector('.modpill[data-mod="home"]'), mod==='home');
+  setActive(document.querySelector('.modpill[data-mod="abn"]'), mod==='abn');
+  setActive(document.querySelector('.modpill[data-mod="ov"]'), mod==='ov');
+  showSub(mod); curMod=mod;
+  document.querySelectorAll('.tabsec').forEach(function(s){s.style.display='none';});
+  var sec=document.getElementById('tab-'+t); if(sec) sec.style.display='';
+  if(t==='home') renderHome();
+  if(t==='stat') renderStat();
+  if(t==='list') renderList();
+  if(t==='ov_stat') ov_renderStat();
+  if(t==='ov_list') ov_renderList();
+}
+function selectMod(mod){
+  var first = mod==='abn'?MOD_ABN[0]:mod==='ov'?MOD_OV[0]:'home';
+  showTab(first);
+}
+function renderHome(){
+  var a=records.slice().sort(function(x,y){return (y.date||'').localeCompare(x.date||'');}).slice(0,4);
+  var box=document.getElementById('homeAbnList');
+  if(box){
+    if(!a.length){ box.innerHTML='<div class="empty">暂无异常记录，点上方「录入异常申报」添加</div>'; }
+    else{
+      box.innerHTML=a.map(function(r){
+        var cats=catArr(r).join('、');
+        return '<div class="hi"><span class="hd">'+esc(r.date||'')+'</span>'+
+          '<span class="hc">'+esc(cats||'')+'：'+(r.phen?esc(String(r.phen).slice(0,42)):'')+'</span>'+
+          '<span class="he">查看→</span></div>';
+      }).join('');
+    }
+  }
+  var o=ov_records.slice().sort(function(x,y){return (y.date||'').localeCompare(x.date||'');}).slice(0,4);
+  var ob=document.getElementById('homeOvList');
+  if(ob){
+    if(!o.length){ ob.innerHTML='<div class="empty">暂无溢流记录，点上方「录入溢流记录」添加</div>'; }
+    else{
+      ob.innerHTML=o.map(function(r){
+        return '<div class="hi"><span class="hd">'+esc(r.date||'')+'</span>'+
+          '<span class="hc">'+esc(r.cat||'')+'：'+(r.cause?esc(String(r.cause).slice(0,42)):'')+'</span>'+
+          '<span class="he">查看→</span></div>';
+      }).join('');
+    }
+  }
+}
+document.querySelectorAll('.modpill').forEach(function(b){b.addEventListener('click',function(){selectMod(b.getAttribute('data-mod'));});});
+document.querySelectorAll('.subtab').forEach(function(b){b.addEventListener('click',function(){showTab(b.getAttribute('data-tab'));});});
 
 /* ============ 录入 ============ */
 function autoFolder(){
@@ -1375,29 +1458,31 @@ document.getElementById('btnConfirmExcel').onclick=function(){
   showTab('list');
 };
 
-/* 内嵌模式：被工作台 iframe 嵌入时隐藏自带页头，保留标签导航 */
+/* 内嵌模式：被工作台 iframe 嵌入时隐藏自带页头，保留顶部导航 */
 var _isEmbed=/[?&]embed/.test(location.search);
 var _focusOv=/[?&]focus=overflow/.test(location.search);
 if(_isEmbed){
   var _h=document.querySelector('header');if(_h)_h.style.display='none';
   document.body.style.background='#fff';
 }
-/* 主工作台把"溢流报告"拎出来做独立板块：focus=overflow 时只显示溢流分组；
-   异常申报台账视图（embed 但非 focus）不再显示溢流分组；
-   直接打开独立文件（非 embed）则两组都保留。 */
+/* 主工作台把"溢流报告"拎出来做独立板块：focus=overflow 时只显示溢流模块；
+   异常申报台账视图（embed 但非 focus）只显示异常申报模块；
+   直接打开独立文件（非 embed）则全部模块（含总览）都保留。 */
 (function(){
-  var gAbn=document.getElementById('sideGrpAbn');
-  var gOv=document.getElementById('sideGrpOv');
+  var pAbn=document.getElementById('modAbn');
+  var pOv=document.getElementById('modOv');
+  var pHome=document.getElementById('modHome');
+  function hide(el){ if(el) el.style.display='none'; }
+  function show(el){ if(el) el.style.display=''; }
   if(_focusOv){
-    if(gAbn)gAbn.style.display='none';
-    if(gOv)gOv.style.display='';
-    showTab('ov_entry');
+    hide(pAbn); hide(pHome); show(pOv);
+    selectMod('ov');
   }else if(_isEmbed){
-    if(gAbn)gAbn.style.display='';
-    if(gOv)gOv.style.display='none';
+    hide(pOv); hide(pHome); show(pAbn);
+    selectMod('abn');
   }else{
-    if(gAbn)gAbn.style.display='';
-    if(gOv)gOv.style.display='';
+    show(pAbn); show(pOv); show(pHome);
+    selectMod('home');
   }
 })();
 
