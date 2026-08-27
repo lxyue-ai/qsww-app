@@ -592,6 +592,11 @@ function load(){try{var s=localStorage.getItem(KEY);DB=s?JSON.parse(s):blank();}
   if(!DB.ledgers)DB=blank();
   migrate();
   if(!localStorage.getItem(KEY)){seed();}
+  // 自动清理旧版自动注入的示例数据
+  var abnBefore=(DB.ledgers.abnormal||[]).length,invBefore=(DB.ledgers.invoice||[]).length;
+  DB.ledgers.abnormal=(DB.ledgers.abnormal||[]).filter(function(r){return !String(r.title||'').startsWith('示例：');});
+  DB.ledgers.invoice=(DB.ledgers.invoice||[]).filter(function(r){return !String(r.no||'').startsWith('示例-');});
+  if(abnBefore!==DB.ledgers.abnormal.length||invBefore!==DB.ledgers.invoice.length){save();}
 }
 function save(suppressPush){try{localStorage.setItem(KEY,JSON.stringify(DB));}catch(e){toast('存储空间不足，请导出备份后删除部分图片');}
   if(!suppressPush&&ghEnabled()){if(ghTimer)clearTimeout(ghTimer);ghTimer=setTimeout(ghPush,1000);}
@@ -605,11 +610,10 @@ function fmt(n){return (Math.round(n*100)/100).toLocaleString('zh-CN');}
 function thisMonth(){return todayStr().slice(0,7);}
 function prevMonth(ym){var y=+ym.slice(0,4),m=+ym.slice(5,7)-1;if(m<1){m=12;y--;}return y+'-'+String(m).padStart(2,'0');}
 
-/* ================= 示例数据 ================= */
+/* ================= 示例数据（已取消自动注入） ================= */
 function seed(){
-  var d=function(off){var t=new Date();t.setDate(t.getDate()-off);return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');};
-  DB.ledgers.abnormal=[{id:uid(),date:d(3),title:'示例：COD 在线分析仪数据异常波动',handle:'已联系运维单位检修',status:'处理中',_s:1}];
-  DB.ledgers.invoice=[{id:uid(),date:d(5),type:'电费发票',amount:107495.57,no:'示例-NO.2026001',note:'1月份电费',_s:1}];
+  // 旧版首次打开会自动写入示例记录；现已取消，避免污染真实台账。
+  // 保留函数名与 DB.sample 标志，用于识别曾经初始化过的数据库。
   DB.sample=true;save();
 }
 
