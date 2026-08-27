@@ -154,9 +154,28 @@
   th{background:#f3f5f8;color:#333;font-weight:700;white-space:nowrap;}
   tbody tr:nth-child(even){background:#fafbfc;}
   tbody tr:hover{background:#fff7f0;}
+  tbody tr:hover td:first-child{background:#fff7f0;}
+  thead th:first-child,tbody td:first-child{position:sticky;left:0;z-index:2;background:inherit;}
+  thead th:first-child{z-index:3;background:#f3f5f8;}
   .tag{display:inline-block;background:#eef3fb;color:var(--blue);border-radius:20px;
     padding:2px 9px;font-size:12px;white-space:nowrap;}
   .rowbtn{margin:2px 3px 2px 0;display:inline-block;white-space:nowrap;}
+
+  /* 窄屏卡片视图：一目了然 */
+  @media (max-width:760px){
+    .table-wrap{max-height:none;border:none;background:transparent;}
+    .table-wrap table,.table-wrap thead,.table-wrap tbody,.table-wrap tr,.table-wrap td{display:block;}
+    .table-wrap thead{display:none;}
+    .table-wrap tbody tr{margin-bottom:12px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+    .table-wrap td{border:none;padding:6px 0;display:flex;gap:10px;justify-content:space-between;align-items:flex-start;}
+    .table-wrap td:not(.noprint){border-bottom:1px dashed #eee;}
+    .table-wrap td:last-child{border-bottom:none;}
+    .table-wrap td::before{content:attr(data-label);font-weight:700;color:#666;font-size:12px;white-space:nowrap;min-width:72px;}
+    .table-wrap td:first-child{position:static;background:transparent!important;font-weight:700;color:var(--red);font-size:15px;border-bottom:1px solid var(--line);margin-bottom:4px;padding-top:0;}
+    .table-wrap td:first-child::before{display:none;}
+    .table-wrap td.noprint{justify-content:flex-start;flex-wrap:wrap;}
+    .table-wrap td.noprint::before{display:none;}
+  }
 
   /* 查找 */
   .searchbox{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px;}
@@ -988,16 +1007,16 @@ function renderList(){
   document.getElementById('listEmpty').style.display=rows.length?'none':'block';
   rows.forEach(function(r){
     var tr=document.createElement('tr');
-    tr.innerHTML='<td>'+cnDate(r.date)+'</td>'+
-      '<td>'+catTagsHtml(r)+'</td>'+
-      '<td>'+esc(r.phen)+(r.sample?' <span style="color:#bbb">[示例]</span>':'')+'</td>'+
-      '<td>'+esc(r.cause)+'</td>'+
-      '<td><button class="btn sm rowbtn" onclick="openReportById(\''+r.id+'\')">生成申报表</button></td>'+
-      '<td>'+(fileCount(r.report)?renderFiles(r.report):'<span style="color:#bbb">未上传</span>')+'</td>'+
-      '<td>'+renderFiles(r.att)+'</td>'+
-      '<td>'+esc(r.approved||'')+'</td>'+
-      '<td>'+esc(r.note||'')+'</td>'+
-      '<td class="noprint">'+opBtns(r)+'</td>';
+    tr.innerHTML='<td data-label="异常日期">'+cnDate(r.date)+'</td>'+
+      '<td data-label="污染物类别">'+catTagsHtml(r)+'</td>'+
+      '<td data-label="异常现象">'+esc(r.phen)+(r.sample?' <span style="color:#bbb">[示例]</span>':'')+'</td>'+
+      '<td data-label="原因分析">'+esc(r.cause)+'</td>'+
+      '<td data-label="生成上报表"><button class="btn sm rowbtn" onclick="openReportById(\''+r.id+'\')">生成申报表</button></td>'+
+      '<td data-label="盖章扫描件">'+(fileCount(r.report)?renderFiles(r.report):'<span style="color:#bbb">未上传</span>')+'</td>'+
+      '<td data-label="其他附件">'+renderFiles(r.att)+'</td>'+
+      '<td data-label="是否批复">'+esc(r.approved||'')+'</td>'+
+      '<td data-label="备注">'+esc(r.note||'')+'</td>'+
+      '<td class="noprint" data-label="操作">'+opBtns(r)+'</td>';
     tb.appendChild(tr);
   });
 }
@@ -1587,18 +1606,18 @@ function ov_renderList(){
   document.getElementById('ovListEmpty').style.display=rows.length?'none':'block';
   rows.forEach(function(r){
     var tr=document.createElement('tr');
-    tr.innerHTML='<td>'+cnDate(r.date)+'</td>'+
-      '<td><span class="tag">'+esc(r.cat)+'</span></td>'+
-      '<td>'+(r.openTime||'')+'</td>'+
-      '<td>'+(r.openLevel||'')+'</td>'+
-      '<td>'+(r.openFlow||'')+'</td>'+
-      '<td>'+(r.closeTime||'')+'</td>'+
-      '<td>'+(r.closeLevel||'')+'</td>'+
-      '<td>'+(r.closeFlow||'')+'</td>'+
-      '<td>'+esc(r.cause||'')+'</td>'+
-      '<td>'+(fileCount(r.report)?renderFiles(r.report):'<span style="color:#bbb">未上传</span>')+'</td>'+
-      '<td>'+renderFiles(r.att)+'</td>'+
-      '<td class="noprint">'+ov_opBtns(r)+'</td>';
+    tr.innerHTML='<td data-label="溢流日期">'+cnDate(r.date)+'</td>'+
+      '<td data-label="类别"><span class="tag">'+esc(r.cat)+'</span></td>'+
+      '<td data-label="开阀时间">'+(r.openTime||'')+'</td>'+
+      '<td data-label="开阀液位(m)">'+(r.openLevel||'')+'</td>'+
+      '<td data-label="开阀流量">'+(r.openFlow||'')+'</td>'+
+      '<td data-label="关阀时间">'+(r.closeTime||'')+'</td>'+
+      '<td data-label="关阀液位(m)">'+(r.closeLevel||'')+'</td>'+
+      '<td data-label="关阀流量">'+(r.closeFlow||'')+'</td>'+
+      '<td data-label="原因">'+esc(r.cause||'')+'</td>'+
+      '<td data-label="红头文">'+(fileCount(r.report)?renderFiles(r.report):'<span style="color:#bbb">未上传</span>')+'</td>'+
+      '<td data-label="其他附件">'+renderFiles(r.att)+'</td>'+
+      '<td class="noprint" data-label="操作">'+ov_opBtns(r)+'</td>';
     tb.appendChild(tr);
   });
 }
