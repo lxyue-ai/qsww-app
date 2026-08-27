@@ -691,28 +691,44 @@ function abnMerge(remote){
   if(Array.isArray(remote.ov_records)){var om={};ov_records.forEach(function(r){if(r&&r.id)om[r.id]=r;});remote.ov_records.forEach(function(r){if(r&&r.id)om[r.id]=r;});ov_records=Object.keys(om).map(function(id){return om[id];});}
   save(records);ov_save();
 }
-async function abnGhPush(){
+async function abnGhPush(isRetry){
   if(!abnGhEnabled())return;
+  if(__abn_syncing){if(!isRetry){setTimeout(function(){abnGhPush(true);},1000);}return;}
+  __abn_syncing=true;
   abnSyncUI('ing');
   try{
-    var c=abnGhConf(),sha=null;
-    try{var g=await fetch(abnGhBase()+(c.branch&&c.branch!=='main'?'?ref='+encodeURIComponent(c.branch):''),{headers:abnGhHeaders()});if(g.ok){var j=await g.json();sha=j.sha;try{var remote=JSON.parse(abnB64dec(j.content));abnMerge(remote);}catch(e){}}}catch(e){}
+    var c=abnGhConf(),sha=null,remote=null;
+    try{
+      var g=await fetch(abnGhBase()+(c.branch&&c.branch!=='main'?'?ref='+encodeURIComponent(c.branch):''),{headers:abnGhHeaders(),cache:'no-store'});
+      if(g.ok){var j=await g.json();sha=j.sha;try{remote=JSON.parse(abnB64dec(j.content));}catch(e){}}
+    }catch(e){}
+    if(remote)abnMerge(remote);
     var payload={records:records,ov_records:ov_records,meta:{updatedAt:Date.now()}};
     var content=abnB64enc(JSON.stringify(payload));
     var body={message:'sync abn/overflow '+new Date().toISOString(),content:content,branch:c.branch||'main'};
     if(sha)body.sha=sha;
     var r=await fetch(abnGhBase(),{method:'PUT',headers:Object.assign({},abnGhHeaders(),{'Content-Type':'application/json'}),body:JSON.stringify(body)});
-    if(!r.ok){var e=await r.json().catch(function(){return {};});throw new Error(e.message||('HTTP '+r.status));}
+    if(!r.ok){
+      var e=await r.json().catch(function(){return {};});
+      if(!isRetry && e && e.message && e.message.indexOf('does not match')>-1){
+        __abn_syncing=false;
+        return abnGhPush(true);
+      }
+      throw new Error(e.message||('HTTP '+r.status));
+    }
     abnSyncUI('ok');
   }catch(e){console.warn('abnGhPush',e);abnSyncUI('err',e.message);throw e;}
+  finally{__abn_syncing=false;}
 }
 async function abnGhPull(){
   if(!abnGhEnabled())return;
+  if(__abn_syncing){return;}
+  __abn_syncing=true;
   abnSyncUI('ing');
   try{
     var c=abnGhConf();
     var url=abnGhBase()+(c.branch&&c.branch!=='main'?'?ref='+encodeURIComponent(c.branch):'');
-    var r=await fetch(url,{headers:abnGhHeaders()});
+    var r=await fetch(url,{headers:abnGhHeaders(),cache:'no-store'});
     if(r.status===404){abnSyncUI('ok');return;}
     if(!r.ok){var e=await r.json().catch(function(){return {};});throw new Error(e.message||('HTTP '+r.status));}
     var j=await r.json();
@@ -723,6 +739,7 @@ async function abnGhPull(){
     if(after>before)toast('已从云端合并 '+(after-before)+' 条记录');
     abnSyncUI('ok');renderList();renderStat();ov_renderList();ov_renderStat();
   }catch(e){console.warn('abnGhPull',e);abnSyncUI('err',e.message);}
+  finally{__abn_syncing=false;}
 }
 function abnSyncUI(state,msg){
   var el=document.getElementById('abnSyncStatus');if(!el)return;
@@ -731,11 +748,11 @@ function abnSyncUI(state,msg){
   else if(state==='err'){el.innerHTML='<span style="color:var(--red)">✗ 同步失败</span>';if(msg)toast('同步失败：'+msg);}
   else {el.innerHTML='<span style="color:var(--muted)">未配置</span>';}
 }
-var __abn_ght=null,__abn_pt=null;
+var __abn_ght=null,__abn_pt=null,__abn_syncing=false;
 function abnGhSchedulePush(){
   if(!abnGhEnabled())return;
   if(__abn_pt)clearTimeout(__abn_pt);
-  __abn_pt=setTimeout(function(){abnGhPush().catch(function(){});},1500);
+  __abn_pt=setTimeout(function(){abnGhPush().catch(function(){});},2500);
 }
 function abnGhStartAuto(){
   if(!abnGhEnabled()){abnSyncUI();return;}
