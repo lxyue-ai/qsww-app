@@ -296,18 +296,18 @@
         <div class="field full"><label>关联文件夹（可选，用于本地归档）</label>
           <input type="text" id="f_folder" placeholder="如 E:\工作台\3、异常申报\8月"></div>
         <div class="field full">
-          <label>盖章申报表扫描件（图片）</label>
-          <input type="file" id="f_report_file" accept="image/*" multiple style="display:none">
-          <button type="button" class="btn sm blue" id="btnPickReport" onclick="document.getElementById('f_report_file').click()">📎 选择图片</button>
+          <label>盖章申报表扫描件（图片 / PDF）</label>
+          <input type="file" id="f_report_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
+          <button type="button" class="btn sm blue" id="btnPickReport" onclick="document.getElementById('f_report_file').click()">📎 选择图片 / PDF</button>
           <div class="upload-preview" id="reportPreview"></div>
-          <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif，可一次选多张，图片直接存在浏览器本地。</div>
+          <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf，可一次选多张，文件直接存在浏览器本地。</div>
         </div>
         <div class="field full">
-          <label>其他相关附件（图片）</label>
-          <input type="file" id="f_att_file" accept="image/*" multiple style="display:none">
-          <button type="button" class="btn sm blue" id="btnPickAtt" onclick="document.getElementById('f_att_file').click()">📎 选择图片</button>
+          <label>其他相关附件（图片 / PDF）</label>
+          <input type="file" id="f_att_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
+          <button type="button" class="btn sm blue" id="btnPickAtt" onclick="document.getElementById('f_att_file').click()">📎 选择图片 / PDF</button>
           <div class="upload-preview" id="attPreview"></div>
-          <div style="font-size:12px;color:#888;margin-top:4px">支持多张现场图、监测记录截图等。</div>
+          <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf 等多种附件。</div>
         </div>
       </div>
       <div class="actions">
@@ -394,7 +394,7 @@
   <section id="tab-ov_entry" class="tabsec" style="display:none">
     <div class="card">
       <h3>登记一条溢流记录</h3>
-      <div class="hint">填完点「保存」，记录即进入溢流台账；之后在「溢流·明细」里可一键<b>生成红头文</b>（向住建局申请 / 备案用），也可上传<b>红头文盖章扫描件</b>、<b>打开关联文件夹</b>（本机 file:// 方式生效）。关联文件夹默认按溢流日期自动归入 <b id="hintOvBase">溢流报告</b> 的对应月份子文件夹，可手动修改。</div>
+      <div class="hint">填完点「保存」，记录即进入溢流台账；之后在「溢流·明细」里可上传<b>红头文盖章扫描件</b>、<b>打开关联文件夹</b>（本机 file:// 方式生效）。关联文件夹默认按溢流日期自动归入 <b id="hintOvBase">溢流报告</b> 的对应月份子文件夹，可手动修改。</div>
       <div class="grid">
         <div class="field"><label>溢流日期<span class="req">*</span></label>
           <input type="date" id="f_ov_date"></div>
@@ -421,18 +421,18 @@
         <div class="field full"><label>关联文件夹（可选，用于本地归档）</label>
           <input type="text" id="f_ov_folder" placeholder="如 E:\工作台\溢流报告\8月"></div>
         <div class="field full">
-          <label>红头文盖章扫描件（图片）</label>
-          <input type="file" id="f_ov_report_file" accept="image/*" multiple style="display:none">
-          <button type="button" class="btn sm blue" onclick="document.getElementById('f_ov_report_file').click()">📎 选择图片</button>
+          <label>红头文盖章扫描件（图片 / PDF）</label>
+          <input type="file" id="f_ov_report_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
+          <button type="button" class="btn sm blue" onclick="document.getElementById('f_ov_report_file').click()">📎 选择图片 / PDF</button>
           <div class="upload-preview" id="ovReportPreview"></div>
-          <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif，可一次选多张，图片直接存在浏览器本地。</div>
+          <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf，可一次选多张，文件直接存在浏览器本地。</div>
         </div>
         <div class="field full">
-          <label>其他相关附件（图片）</label>
-          <input type="file" id="f_ov_att_file" accept="image/*" multiple style="display:none">
-          <button type="button" class="btn sm blue" onclick="document.getElementById('f_ov_att_file').click()">📎 选择图片</button>
+          <label>其他相关附件（图片 / PDF）</label>
+          <input type="file" id="f_ov_att_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
+          <button type="button" class="btn sm blue" onclick="document.getElementById('f_ov_att_file').click()">📎 选择图片 / PDF</button>
           <div class="upload-preview" id="ovAttPreview"></div>
-          <div style="font-size:12px;color:#888;margin-top:4px">支持多张现场图、监测记录截图等。</div>
+          <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf 等多种附件。</div>
         </div>
       </div>
       <div class="actions">
@@ -463,7 +463,7 @@
         <thead><tr>
           <th>溢流日期</th><th>类别</th><th>开阀时间</th><th>开阀液位(m)</th><th>开阀流量</th>
           <th>关阀时间</th><th>关阀液位(m)</th><th>关阀流量</th><th>原因</th>
-          <th>红头文</th><th>其他附件</th><th class="noprint" style="min-width:160px">操作</th>
+          <th>其他附件</th><th class="noprint" style="min-width:160px">操作</th>
         </tr></thead>
         <tbody id="ovTblBody"></tbody>
       </table></div>
@@ -621,9 +621,15 @@
 /* ============ 存储 ============ */
 var KEY='qsww_abn_ledger_v1', SETKEY='qsww_abn_settings';
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||[];}catch(e){return [];}}
-function save(d){localStorage.setItem(KEY,JSON.stringify(d));abnGhSchedulePush();}
+function save(d){
+  try{localStorage.setItem(KEY,JSON.stringify(d));abnGhSchedulePush();}
+  catch(e){toast('保存失败：存储空间不足，请减少附件数量或图片大小后重试');}
+}
 function loadSet(){try{return JSON.parse(localStorage.getItem(SETKEY))||{};}catch(e){return {};}}
-function saveSet(s){localStorage.setItem(SETKEY,JSON.stringify(s));abnGhSchedulePush();}
+function saveSet(s){
+  try{localStorage.setItem(SETKEY,JSON.stringify(s));abnGhSchedulePush();}
+  catch(e){toast('保存失败：存储空间不足，请减少附件数量或图片大小后重试');}
+}
 function normalizePath(p,folder){
   if(!p)return '';
   p=String(p).trim();
@@ -671,7 +677,10 @@ document.getElementById('hintBase').textContent=settings.baseFolder.split('\\').
 var OV_KEY='qsww_overflow_v1';
 var ov_records=[];
 try{ov_records=JSON.parse(localStorage.getItem(OV_KEY)||'[]');}catch(e){}
-function ov_save(){localStorage.setItem(OV_KEY,JSON.stringify(ov_records));abnGhSchedulePush();}
+function ov_save(){
+  try{localStorage.setItem(OV_KEY,JSON.stringify(ov_records));abnGhSchedulePush();}
+  catch(e){toast('保存失败：存储空间不足，请减少附件数量或图片大小后重试');}
+}
 if(!settings.overflowBase)settings.overflowBase='E:\\工作台\\溢流报告';
 document.getElementById('hintOvBase').textContent=settings.overflowBase.split('\\').pop();
 document.getElementById('setOvBase').value=settings.overflowBase;
@@ -824,13 +833,21 @@ function renderFiles(v){
   if(Array.isArray(v)){
     if(!v.length)return '<span style="color:#bbb">—</span>';
     return v.map(function(f){
-      var name=esc((f.name||'').split('\\').pop()||'图片');
-      var click=f.data?'previewImage(this.dataset.img)':'openLocalFile(this.getAttribute(\'data-path\'))';
-      var dataAttr=f.data?('data-img="'+esc(f.data)+'"'):('data-path="'+esc(f.name||'')+'"');
-      return '<span class="file-link" '+dataAttr+' onclick="'+click+'"><span class="ic">'+fileIcon(f.name||'')+'</span>'+name+'</span>';
+      var name=esc((f.name||'').split('\\').pop()||'附件');
+      var isImg=isImage(f.name||''),isPdf=/\.pdf$/i.test(f.name||'');
+      var click=f.data?(isImg?'previewImage(this.dataset.img)':(isPdf?'openPdf(this.dataset.img,this.dataset.name)':'downloadData(this.dataset.img,this.dataset.name)')):'openLocalFile(this.getAttribute(\'data-path\'))';
+      var dataAttrs=f.data?('data-img="'+esc(f.data)+'" data-name="'+esc(f.name||'')+'"'):('data-path="'+esc(f.name||'')+'"');
+      return '<span class="file-link" '+dataAttrs+' onclick="'+click+'"><span class="ic">'+fileIcon(f.name||'')+'</span>'+name+'</span>';
     }).join('');
   }
   return linksHtml(v);
+}
+function openPdf(dataUrl,name){
+  var w=window.open(dataUrl,'_blank');
+  if(!w){toast('浏览器拦截了弹窗，请允许后重试');}
+}
+function downloadData(dataUrl,name){
+  var a=document.createElement('a');a.href=dataUrl;a.download=name||'附件';document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 
 /* ============ 标签页（顶部导航，模块感知） ============ */
@@ -955,10 +972,35 @@ function readForm(){
     rep:document.getElementById('f_rep').value.trim(),
     folder:document.getElementById('f_folder').value.trim()};
 }
+function compressImage(file,maxSide,quality){
+  return new Promise(function(resolve){
+    if(!file.type.match(/^image\/(jpeg|png|webp|bmp|gif)$/i)){resolve(null);return;}
+    var img=new Image(),url=URL.createObjectURL(file);
+    img.onload=function(){
+      var w=img.width,h=img.height;
+      if(Math.max(w,h)<=maxSide){URL.revokeObjectURL(url);resolve(null);return;}
+      var scale=maxSide/Math.max(w,h);w=Math.round(w*scale);h=Math.round(h*scale);
+      var c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);resolve(null);};
+    img.src=url;
+  });
+}
 function readFileAsBase64(file){
   return new Promise(function(resolve,reject){
     var rd=new FileReader();
-    rd.onload=function(){resolve({name:file.name,type:file.type,size:file.size,data:rd.result})};
+    rd.onload=function(){
+      var item={name:file.name,type:file.type,size:file.size,data:rd.result};
+      if(file.type.match(/^image\/(jpeg|png|webp|bmp|gif)$/i)){
+        compressImage(file,1920,0.85).then(function(comp){
+          if(comp){item.data=comp;item.size=Math.round(comp.length*0.75);item.compressed=true;}
+          resolve(item);
+        });
+      }else{resolve(item);}
+    };
     rd.onerror=function(){reject(new Error('读取失败'));};
     rd.readAsDataURL(file);
   });
@@ -967,8 +1009,10 @@ function renderUploadPreview(containerId,files){
   var box=document.getElementById(containerId);if(!box)return;
   box.innerHTML=files.map(function(f,idx){
     var src=f.data||'';
+    var isImg=isImage(f.name||''),isPdf=/\.pdf$/i.test(f.name||'');
+    var icon=src?(isImg?'<img src="'+esc(src)+'" alt="">':(isPdf?'<span style="font-size:24px">📄</span>':'<span style="font-size:24px">📎</span>')):'<span style="font-size:24px">🖼</span>';
     return '<div class="thumb" title="'+esc(f.name)+'">'+
-      (src?'<img src="'+esc(src)+'" alt="">':'<span style="font-size:24px">🖼</span>')+
+      icon+
       '<span class="del" onclick="removePendingFile(\''+containerId+'\','+idx+')" title="移除">&times;</span>'+
       '<span class="fname">'+esc(f.name)+'</span></div>';
   }).join('');
@@ -1226,9 +1270,20 @@ async function buildReportDocx(r){
     '{{est}}': xmlEsc(cn(r.est||'')),
     '{{rep}}': xmlEsc(r.rep||'')
   };
-  for(var k in map){ if(Object.prototype.hasOwnProperty.call(map,k)) xml=xml.split(k).join(map[k]); }
+  xml=replaceWordPlaceholders(xml,map);
   zip.file('word/document.xml', xml);
   return await zip.generateAsync({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+/* Word XML 中占位符可能被拆成多个 <w:t>，直接 split 会失效；用正则忽略中间 XML 标签 */
+function replaceWordPlaceholders(xml,map){
+  for(var k in map){
+    if(!Object.prototype.hasOwnProperty.call(map,k)) continue;
+    var escK=k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    var re=new RegExp(escK.split('').join('(?:<[^>]+>)*'),'g');
+    var v=xmlEsc(String(map[k]).replace(/\n/g,' '));
+    xml=xml.replace(re,v);
+  }
+  return xml;
 }
 function openReport(r){
   var dateStr=(r.date||'').replace(/-/g,'');
@@ -1581,8 +1636,10 @@ function ov_renderUploadPreview(containerId,files){
   var box=document.getElementById(containerId);if(!box)return;
   box.innerHTML=files.map(function(f,idx){
     var src=f.data||'';
+    var isImg=isImage(f.name||''),isPdf=/\.pdf$/i.test(f.name||'');
+    var icon=src?(isImg?'<img src="'+esc(src)+'" alt="">':(isPdf?'<span style="font-size:24px">📄</span>':'<span style="font-size:24px">📎</span>')):'<span style="font-size:24px">🖼</span>';
     return '<div class="thumb" title="'+esc(f.name)+'">'+
-      (src?'<img src="'+esc(src)+'" alt="">':'<span style="font-size:24px">🖼</span>')+
+      icon+
       '<span class="del" onclick="ov_removePendingFile(\''+containerId+'\','+idx+')" title="移除">&times;</span>'+
       '<span class="fname">'+esc(f.name)+'</span></div>';
   }).join('');
@@ -1632,15 +1689,13 @@ function ov_renderList(){
       '<td data-label="关阀液位(m)">'+(r.closeLevel||'')+'</td>'+
       '<td data-label="关阀流量">'+(r.closeFlow||'')+'</td>'+
       '<td data-label="原因">'+esc(r.cause||'')+'</td>'+
-      '<td data-label="红头文">'+(fileCount(r.report)?renderFiles(r.report):'<span style="color:#bbb">未上传</span>')+'</td>'+
-      '<td data-label="其他附件">'+renderFiles(r.att)+'</td>'+
+      '<td data-label="其他附件">'+renderFiles(r.report)+' '+renderFiles(r.att)+'</td>'+
       '<td class="noprint" data-label="操作">'+ov_opBtns(r)+'</td>';
     tb.appendChild(tr);
   });
 }
 function ov_opBtns(r){
   return (r.folder?'<span class="btn sm gray rowbtn" style="color:#fff" data-path="'+esc(r.folder)+'" onclick="openLocalFile(this.getAttribute(\'data-path\'))">打开文件夹</span>':'')+
-    '<button class="btn sm rowbtn" onclick="ov_makeDoc(\''+r.id+'\')">生成红头文</button>'+
     '<button class="btn sm rowbtn" onclick="ov_editRec(\''+r.id+'\')">编辑</button>'+
     '<button class="btn sm ghost rowbtn" onclick="ov_delRec(\''+r.id+'\')">删除</button>';
 }
@@ -1874,8 +1929,7 @@ function ov_recCard(r){
     '<div class="p"><b>关阀：</b>'+esc(r.closeTime||'')+'　液位 '+esc(r.closeLevel||'-')+'m　流量 '+esc(r.closeFlow||'-')+' m³/h</div>'+
     (r.cause?'<div class="p"><b>原因：</b>'+esc(r.cause)+'</div>':'')+
     (r.note?'<div class="p"><b>备注：</b>'+esc(r.note)+'</div>':'')+
-    '<div class="links"><b>红头文：</b>'+renderFiles(r.report)+'</div>'+
-    '<div class="links"><b>其他附件：</b>'+renderFiles(r.att)+'</div></div>';
+    '<div class="links"><b>附件：</b>'+renderFiles(r.report)+' '+renderFiles(r.att)+'</div></div>';
 }
 
 /* 红头文（向住建局申请 / 备案）生成 —— 基于 .docx 模板替换占位符 */
