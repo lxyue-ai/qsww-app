@@ -106,6 +106,11 @@ table.tb{width:100%;border-collapse:collapse;font-size:14px}
 table.tb th{background:var(--blue-l);color:var(--blue-d);padding:9px 10px;text-align:left;white-space:nowrap}
 table.tb td{padding:9px 10px;border-top:1px solid var(--border);white-space:nowrap}
 .tbwrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}
+table.tb.water-rpt th,table.tb.water-rpt td{border:1px solid var(--border);text-align:center;white-space:nowrap}
+table.tb.water-rpt th{background:var(--blue-l);color:var(--blue-d);font-weight:700}
+table.tb.water-rpt td:first-child,table.tb.water-rpt th:first-child{font-weight:600}
+.water-rpt-head{display:flex;justify-content:space-between;align-items:flex-end;font-size:13px;margin:2px 2px 8px;color:#333}
+.water-rpt-foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:13px;margin-top:14px;color:#333}
 .pill{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:700}
 .pill.g{background:#e7f6ee;color:var(--green)}
 .pill.r{background:#fdecec;color:var(--red)}
@@ -1644,9 +1649,77 @@ var STAT_CFG={
  transfer:{src:'transfer',cols:[{k:'gross',l:'毛重(T)'},{k:'tare',l:'皮重(T)'},{k:'net',l:'净重(T)'}],dk:'date'},
  reduction:{src:'reduction',cols:[{k:'blower',l:'鼓风机(h)'},{k:'pump',l:'提升泵(h)'},{k:'dewat',l:'污泥脱水机(h)'},{k:'decant',l:'滗水器(h)'}],dk:'date'}
 };
+/* ================= 水量报表（按官方进出水量统计表格式，自动计算 max/min/avg/合计） ================= */
+function waterRows(ym){
+  var y=+ym.slice(0,4),m=+ym.slice(5,7),daysInMonth=new Date(y,m,0).getDate();
+  var rows=[],ins=[],outs=[],sumIn=0,sumOut=0;
+  for(var d=1;d<=daysInMonth;d++){
+    var ds=ym+'-'+String(d).padStart(2,'0');
+    var r=DB.ledgers.water.find(function(x){return x.date===ds;});
+    var inQ=r?num(r.inflow):null,outQ=r?num(r.outflow):null;
+    if(inQ!=null){ins.push(inQ);sumIn+=inQ;}
+    if(outQ!=null){outs.push(outQ);sumOut+=outQ;}
+    rows.push({d:d,inQ:inQ,outQ:outQ});
+  }
+  function mx(a){return a.length?Math.max.apply(null,a):null;}
+  function mn(a){return a.length?Math.min.apply(null,a):null;}
+  function av(a,t){return a.length?Math.round(t/a.length*100)/100:null;}
+  return {y:y,m:m,daysInMonth:daysInMonth,rows:rows,
+    maxIn:mx(ins),minIn:mn(ins),avgIn:av(ins,sumIn),sumIn:sumIn,
+    maxOut:mx(outs),minOut:mn(outs),avgOut:av(outs,sumOut),sumOut:sumOut};
+}
+function renderWaterReport(ym){
+  var d=waterRows(ym);
+  var h='<h2 style="margin-bottom:6px;text-align:center">清水县污水处理厂 '+d.y+'年'+d.m+'月份进出水量统计表</h2>';
+  h+='<div class="water-rpt-head"><span>清水县住房和城乡建设局（盖章）</span><span>运营单位：（盖章）</span></div>';
+  h+='<div class="tbwrap"><table class="tb water-rpt"><thead><tr><th>日期</th><th>进水量m³</th><th>出水量m³</th></tr></thead><tbody>';
+  d.rows.forEach(function(r){
+    h+='<tr><td>'+r.d+'日</td><td>'+fe(r.inQ)+'</td><td>'+fe(r.outQ)+'</td></tr>';
+  });
+  h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>最大值</td><td>'+fe(d.maxIn)+'</td><td>'+fe(d.maxOut)+'</td></tr>';
+  h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>最小值</td><td>'+fe(d.minIn)+'</td><td>'+fe(d.minOut)+'</td></tr>';
+  h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>平均值</td><td>'+fe(d.avgIn)+'</td><td>'+fe(d.avgOut)+'</td></tr>';
+  h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(d.sumIn)+'</td><td>'+fe(d.sumOut)+'</td></tr>';
+  h+='</tbody></table></div>';
+  h+='<div class="water-rpt-foot"><span>审核人：</span><span>编制人：</span><span>编制日期：'+cnDate(todayStr())+'</span></div>';
+  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportWaterCSV(\''+ym+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button><button class="btn ghost" onclick="exportWaterDoc(\''+ym+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>导出 Word（可打印盖章）</button></div>';
+  document.getElementById('statsBody').innerHTML=h;
+}
+function exportWaterCSV(ym){
+  var d=waterRows(ym);
+  var csv='﻿清水县污水处理厂'+d.y+'年'+d.m+'月份进出水量统计表\n清水县住房和城乡建设局（盖章）,运营单位：（盖章）\n日期,进水量m³,出水量m³\n';
+  d.rows.forEach(function(r){csv+=r.d+'日,'+fve(r.inQ)+','+fve(r.outQ)+'\n';});
+  csv+='最大值,'+fve(d.maxIn)+','+fve(d.maxOut)+'\n';
+  csv+='最小值,'+fve(d.minIn)+','+fve(d.minOut)+'\n';
+  csv+='平均值,'+fve(d.avgIn)+','+fve(d.avgOut)+'\n';
+  csv+='合计,'+fve(d.sumIn)+','+fve(d.sumOut)+'\n';
+  csv+='审核人：,,编制人：,,编制日期：'+cnDate(todayStr())+'\n';
+  download(csv,'进出水量统计表_'+ym+'.csv','text/csv');
+}
+function exportWaterDoc(ym){
+  var d=waterRows(ym);
+  var body='<h1 style="text-align:center;font-size:18pt">清水县污水处理厂 '+d.y+'年'+d.m+'月份进出水量统计表</h1>'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:10pt"><tr>'
+    +'<td style="width:50%;text-align:left;font-size:11pt;vertical-align:bottom;border:none">清水县住房和城乡建设局（盖章）</td>'
+    +'<td style="width:50%;text-align:right;font-size:11pt;vertical-align:bottom;border:none">运营单位：（盖章）</td></tr></table>'
+    +'<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%;text-align:center;font-size:11pt">'
+    +'<tr><th style="width:34%">日期</th><th>进水量m³</th><th>出水量m³</th></tr>';
+  d.rows.forEach(function(r){body+='<tr><td>'+r.d+'日</td><td>'+fe(r.inQ)+'</td><td>'+fe(r.outQ)+'</td></tr>';});
+  body+='<tr style="font-weight:bold"><td>最大值</td><td>'+fe(d.maxIn)+'</td><td>'+fe(d.maxOut)+'</td></tr>';
+  body+='<tr style="font-weight:bold"><td>最小值</td><td>'+fe(d.minIn)+'</td><td>'+fe(d.minOut)+'</td></tr>';
+  body+='<tr style="font-weight:bold"><td>平均值</td><td>'+fe(d.avgIn)+'</td><td>'+fe(d.avgOut)+'</td></tr>';
+  body+='<tr style="font-weight:bold"><td>合计</td><td>'+fe(d.sumIn)+'</td><td>'+fe(d.sumOut)+'</td></tr>';
+  body+='</table>';
+  body+='<table style="width:100%;border-collapse:collapse;margin-top:14pt"><tr>'
+    +'<td style="width:33%;border:none;font-size:11pt">审核人：</td>'
+    +'<td style="width:33%;border:none;font-size:11pt;text-align:center">编制人：</td>'
+    +'<td style="width:34%;border:none;font-size:11pt;text-align:right">编制日期：'+cnDate(todayStr())+'</td></tr></table>';
+  exportWord('进出水量统计表_'+ym+'.doc',body);
+}
 function renderStats(){
   var type=document.getElementById('s_type').value,mode=document.getElementById('s_period').value;
   var ym=document.getElementById('s_month').value||thisMonth();
+  if(type==='water'){renderWaterReport(ym);return;}
   if(type==='sched'){renderSched(ym);return;}
   if(type==='redRep'){renderRedRep(ym);return;}
   if(type==='selfCheck'){renderSelfCheck(ym);return;}
@@ -1974,6 +2047,7 @@ function exportSelfCheckDoc(ym){
 
 function exportStatsCSV(){
   var type=document.getElementById('s_type').value,mode=document.getElementById('s_period').value;
+  if(type==='water'){exportWaterCSV(document.getElementById('s_month').value||thisMonth());return;}
   if(type==='sched'){exportSchedCSV(document.getElementById('s_month').value||thisMonth());return;}
   if(type==='redRep'){exportRedDoc(document.getElementById('s_month').value||thisMonth());return;}
   if(type==='selfCheck'){exportSelfCheckCSV(document.getElementById('s_month').value||thisMonth());return;}
