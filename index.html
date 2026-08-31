@@ -1340,15 +1340,16 @@ function exportChlorine(){
 function renderGenericLedger(cat,targetId){
   var cfg=LEDGERS[cat],rows=DB.ledgers[cat]||[];
   var disp=cfg.disp?cfg.fields.filter(function(f){return cfg.disp.indexOf(f.k)>=0;}):cfg.fields;
+  var idP='lf_'+cat+'_';                 /* 不同台账类目 id 前缀隔离，避免隐藏视图中的同名 input 被误读 */
   var h='<div class="grid3" style="margin-bottom:10px">';
   cfg.fields.forEach(function(f){
-    if(f.k==='net'&&cfg.autoNet){h+='<div class="fld"><label>'+f.l+'</label><input type="number" id="lf_net" readonly style="background:var(--blue-xl)"></div>';return;}
+    if(f.k==='net'&&cfg.autoNet){h+='<div class="fld"><label>'+f.l+'</label><input type="number" id="'+idP+'net" readonly style="background:var(--blue-xl)"></div>';return;}
     var inp;
-    if(f.t==='sel')inp='<select id="lf_'+f.k+'">'+f.opts.map(function(o){return '<option'+(f.d===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';
-    else if(f.t==='ta')inp='<textarea class="fldta" id="lf_'+f.k+'">'+(f.d||'')+'</textarea>';
-    else if(f.t==='text')inp='<input type="text" id="lf_'+f.k+'"'+(f.d?' value="'+f.d+'"':'')+'>';
-    else if(f.t==='date'||f.t==='month'||f.t==='datetime-local')inp='<input type="'+f.t+'" id="lf_'+f.k+'">';
-    else inp='<input type="number" id="lf_'+f.k+'" inputmode="decimal"'+(cfg.autoNet&&(f.k==='gross'||f.k==='tare')?' oninput="calcNet()"':'')+'>';
+    if(f.t==='sel')inp='<select id="'+idP+f.k+'">'+f.opts.map(function(o){return '<option'+(f.d===o?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';
+    else if(f.t==='ta')inp='<textarea class="fldta" id="'+idP+f.k+'">'+(f.d||'')+'</textarea>';
+    else if(f.t==='text')inp='<input type="text" id="'+idP+f.k+'"'+(f.d?' value="'+f.d+'"':'')+'>';
+    else if(f.t==='date'||f.t==='month'||f.t==='datetime-local')inp='<input type="'+f.t+'" id="'+idP+f.k+'">';
+    else inp='<input type="number" id="'+idP+f.k+'" inputmode="decimal"'+(cfg.autoNet&&(f.k==='gross'||f.k==='tare')?' oninput="calcNet(\''+cat+'\')"':'')+'>';
     h+='<div class="fld"'+(f.t==='ta'?' style="grid-column:1/-1"':'')+'><label>'+f.l+'</label>'+inp+'</div>';
   });
   h+='</div><div class="row" style="margin-bottom:14px"><button class="btn" id="ledgerAddBtn" onclick="addLedgerRow(\''+cat+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>'+(curEdit.cat===cat?'保存修改':'添加记录')+'</button>'+(curEdit.cat===cat?'<button class="btn ghost" onclick="cancelLedgerEdit()">取消</button>':'')+(IMPORT_MAP[cat]?'<button class="btn ghost" onclick="openImport(\''+cat+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导入表格</button>':'')+'<button class="btn ghost" onclick="exportCSV(\''+cat+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button></div>';
@@ -1380,8 +1381,8 @@ function renderGenericLedger(cat,targetId){
   document.getElementById(targetId||'ledgerBody').innerHTML=h;
 }
 function addLedgerRow(cat){
-  var cfg=LEDGERS[cat],r={};
-  cfg.fields.forEach(function(f){r[f.k]=gv('lf_'+f.k);});
+  var cfg=LEDGERS[cat],r={},idP='lf_'+cat+'_';
+  cfg.fields.forEach(function(f){r[f.k]=gv(idP+f.k);});
   if(!r.date&&!r.month){toast('请至少填写日期/月份');return;}
   if(cat==='transfer'&&r.net===''){toast('请填写净重');return;}
   if(curEdit.cat===cat&&curEdit.id){
@@ -1392,12 +1393,18 @@ function addLedgerRow(cat){
   r.id=uid();
   DB.ledgers[cat].push(r);save();renderLedger();renderToday();renderSludge();toast('已添加');
 }
+function calcNet(cat){
+  var idP='lf_'+cat+'_';
+  var g=num(gv(idP+'gross')),t=num(gv(idP+'tare'));
+  document.getElementById(idP+'net').value=(g||t)?Math.round((g-t)*100)/100:'';
+}
 function ledgerEdit(cat,id){
   var cfg=LEDGERS[cat],r=DB.ledgers[cat].find(function(x){return x.id===id;});if(!r)return;
   curEdit={cat:cat,id:id};
   if(cat==='transfer'||cat==='sludge')renderSludge();else renderLedger();
+  var idP='lf_'+cat+'_';
   cfg.fields.forEach(function(f){
-    var el=document.getElementById('lf_'+f.k);if(!el)return;
+    var el=document.getElementById(idP+f.k);if(!el)return;
     var v=r[f.k]==null?'':r[f.k];
     el.value=v;
   });
