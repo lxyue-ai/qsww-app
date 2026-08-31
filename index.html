@@ -1270,7 +1270,7 @@ var LEDGERS={
  overflow:{name:'溢流报告',red:true,fields:[{k:'date',l:'日期',t:'date'},{k:'reason',l:'溢流原因',t:'text'},{k:'open',l:'开阀时间',t:'datetime-local'},{k:'openFlow',l:'开阀进水流量(m³/h)'},{k:'openLevel',l:'开阀集水井液位(m)'},{k:'close',l:'关阀时间',t:'datetime-local'},{k:'closeFlow',l:'关阀进水流量(m³/h)'},{k:'closeLevel',l:'关阀集水井液位(m)'},{k:'status',l:'状态',t:'sel',opts:['已闭环','未闭环']}],
   computed:[{l:'溢流时长',fn:function(r){if(!r.open||!r.close)return '-';var ms=new Date(r.close)-new Date(r.open);if(ms<0)return '-';return Math.floor(ms/3600000)+'小时'+Math.round(ms%3600000/60000)+'分钟';}}]},
  sludge:{name:'污泥台账',fields:[{k:'date',l:'日期',t:'date'},{k:'cake',l:'泥饼量(T)'},{k:'hours',l:'脱水机运行(h)'},{k:'dest',l:'处置去向',t:'text'}]},
- transfer:{name:'污泥转运',hidden:true,autoNet:true,attach:'过磅单',fields:[{k:'date',l:'转运日期',t:'date'},{k:'gross',l:'毛重(T)'},{k:'tare',l:'皮重(T)'},{k:'net',l:'净重(T) 自动'},{k:'plate',l:'车牌号',t:'text'},{k:'driver',l:'运输人员',t:'text'},{k:'note',l:'备注',t:'text'}]},
+ transfer:{name:'污泥转运',hidden:true,attach:'过磅单',fields:[{k:'date',l:'转运日期',t:'date'},{k:'net',l:'净重(T)'},{k:'plate',l:'车牌号',t:'text'},{k:'driver',l:'运输人员',t:'text'},{k:'note',l:'备注',t:'text'}]},
  electric:{name:'电费台账',attach:'发票',fields:[{k:'month',l:'月份',t:'month'},{k:'oldKwh',l:'老厂用电量(度)'},{k:'oldFee',l:'老厂电费(元)'},{k:'newKwh',l:'新厂用电量(度)'},{k:'newFee',l:'新厂电费(元)'},{k:'note',l:'备注',t:'text'}]},
  chemical:{name:'药剂台账(kg)',fields:[{k:'date',l:'日期',t:'date'},{k:'pac',l:'PAC'},{k:'c10',l:'次氯酸钠'},{k:'salt',l:'无碘盐'},{k:'carbon',l:'复合碳源'},{k:'pam',l:'PAM'},{k:'fe',l:'铁盐'},{k:'lime',l:'石灰'}]},
  chemStock:{name:'药剂月度库存',hidden:true,fields:[{k:'month',l:'月份',t:'month'},{k:'item',l:'药剂',t:'sel',opts:['PAC','次氯酸钠','无碘盐','复合碳源','PAM','铁盐','石灰']},{k:'inQty',l:'本月入库量(kg)'},{k:'lastBal',l:'上月结余(kg)'},{k:'curBal',l:'本月剩余(kg)'},{k:'note',l:'备注',t:'text'}]},
@@ -1368,37 +1368,36 @@ function renderGenericLedger(cat,targetId){
   h+='</tbody></table></div>';
   document.getElementById(targetId||'ledgerBody').innerHTML=h;
 }
-function calcNet(){var g=num(gv('lf_gross')),t=num(gv('lf_tare'));document.getElementById('lf_net').value=(g||t)?Math.round((g-t)*100)/100:'';}
 function addLedgerRow(cat){
   var cfg=LEDGERS[cat],r={};
   cfg.fields.forEach(function(f){r[f.k]=gv('lf_'+f.k);});
   if(!r.date&&!r.month){toast('请至少填写日期/月份');return;}
+  if(cat==='transfer'&&r.net===''){toast('请填写净重');return;}
   if(curEdit.cat===cat&&curEdit.id){
     var ex=DB.ledgers[cat].find(function(x){return x.id===curEdit.id;});
     if(ex){cfg.fields.forEach(function(f){if(f.k!=='id')ex[f.k]=r[f.k];});}
-    curEdit={cat:null,id:null};save();renderLedger();renderToday();toast('已修改');return;
+    curEdit={cat:null,id:null};save();renderLedger();renderToday();renderSludge();toast('已修改');return;
   }
   r.id=uid();
-  if(cfg.autoNet)r.net=Math.round((num(r.gross)-num(r.tare))*100)/100;
-  DB.ledgers[cat].push(r);save();renderLedger();renderToday();toast('已添加');
+  DB.ledgers[cat].push(r);save();renderLedger();renderToday();renderSludge();toast('已添加');
 }
 function ledgerEdit(cat,id){
   var cfg=LEDGERS[cat],r=DB.ledgers[cat].find(function(x){return x.id===id;});if(!r)return;
   curEdit={cat:cat,id:id};
-  renderLedger();
+  if(cat==='transfer'||cat==='sludge')renderSludge();else renderLedger();
   cfg.fields.forEach(function(f){
     var el=document.getElementById('lf_'+f.k);if(!el)return;
     var v=r[f.k]==null?'':r[f.k];
     el.value=v;
   });
-  var top=document.getElementById('ledgerBody');if(top)top.scrollIntoView({behavior:'smooth'});
+  var top=document.getElementById(cat==='transfer'||cat==='sludge'?'sludgeBody':'ledgerBody');if(top)top.scrollIntoView({behavior:'smooth'});
   toast('已载入记录，修改后点「保存修改」（不改动直接点「取消」）');
 }
-function cancelLedgerEdit(){curEdit={cat:null,id:null};renderLedger();toast('已取消编辑');}
+function cancelLedgerEdit(){curEdit={cat:null,id:null};if(sludgeSub==='transfer'||sludgeSub==='prod')renderSludge();else renderLedger();toast('已取消编辑');}
 function delLedgerRow(cat,id){
   DB.ledgers[cat]=DB.ledgers[cat].filter(function(x){return x.id!==id;});
   if(curEdit.cat===cat&&curEdit.id===id)curEdit={cat:null,id:null};
-  save();renderLedger();renderToday();toast('已删除');
+  save();renderLedger();renderToday();renderSludge();toast('已删除');
 }
 /* 异常报告：按《甘肃省污染源在线自动监控设施异常情况申报表》格式生成 Word */
 function genAbnormalDoc(id){
@@ -1646,7 +1645,7 @@ var STAT_CFG={
  chemical:{src:'chemical',cols:[{k:'pac',l:'PAC(kg)'},{k:'c10',l:'次氯酸钠(kg)'},{k:'salt',l:'无碘盐(kg)'},{k:'carbon',l:'复合碳源(kg)'},{k:'pam',l:'PAM(kg)'},{k:'fe',l:'铁盐(kg)'},{k:'lime',l:'石灰(kg)'}],dk:'date'},
  electric:{src:'electric',cols:[{k:'oldKwh',l:'老厂用电量(度)'},{k:'oldFee',l:'老厂电费(元)'},{k:'newKwh',l:'新厂用电量(度)'},{k:'newFee',l:'新厂电费(元)'}],dk:'month'},
  sludge:{src:'sludge',cols:[{k:'cake',l:'泥饼量(T)'},{k:'hours',l:'脱水机运行(h)'}],dk:'date'},
- transfer:{src:'transfer',cols:[{k:'gross',l:'毛重(T)'},{k:'tare',l:'皮重(T)'},{k:'net',l:'净重(T)'}],dk:'date'},
+ transfer:{src:'transfer',cols:[{k:'net',l:'净重(T)'}],dk:'date'},
  reduction:{src:'reduction',cols:[{k:'blower',l:'鼓风机(h)'},{k:'pump',l:'提升泵(h)'},{k:'dewat',l:'污泥脱水机(h)'},{k:'decant',l:'滗水器(h)'}],dk:'date'}
 };
 /* ================= 水量报表（按官方进出水量统计表格式，自动计算 max/min/avg/合计） ================= */
@@ -2281,7 +2280,7 @@ var IMPORT_MAP={
  invoice:{date:['日期'],type:['类型','发票类型'],amount:['金额'],no:['票号','发票号','发票号码'],note:['备注']},
  dispatch:{date:['日期'],shift:['班次'],content:['调度内容','内容'],person:['执行人'],status:['完成情况','状态']},
  docentry:{date:['日期'],toOrg:['主送机关','主送'],ccOrg:['抄送'],docNo:['发文字号','文号'],summary:['摘由','摘要']},
- transfer:{date:['转运日期','日期'],gross:['毛重'],tare:['皮重'],net:['净重'],plate:['车牌号','车牌'],driver:['运输人员','运输人','司机'],note:['备注']},
+ transfer:{date:['转运日期','日期'],net:['净重'],plate:['车牌号','车牌'],driver:['运输人员','运输人','司机'],note:['备注']},
  chemStock:{month:['月份'],item:['药剂','物品'],inQty:['本月入库','入库量','入库'],lastBal:['上月结余'],curBal:['本月剩余','剩余','结余'],note:['备注']},
  abnormal:{date:['发生异常日期','异常日期','日期'],site:['自动监控现场端名称','现场端','监控点'],pollutant:['污染物类别','污染物'],title:['异常现象','现象'],cause:['原因分析','原因'],estDate:['预计恢复','恢复日期'],reporter:['填表人'],operator:['第三方运维','运维人','运维'],declareDate:['申报日期'],reported:['是否报备','报备','环保部门'],handle:['处理情况'],note:['备注'],status:['状态']},
  overflow:{date:['日期'],reason:['溢流原因','原因'],open:['开阀时间'],openFlow:['开阀进水流量'],openLevel:['开阀集水井液位'],close:['关阀时间'],closeFlow:['关阀进水流量'],closeLevel:['关阀集水井液位'],status:['状态']}
