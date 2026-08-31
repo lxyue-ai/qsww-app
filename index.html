@@ -628,6 +628,7 @@ function seed(){
 
 /* ================= 导航 ================= */
 var curLedger='water', curFileCat='异常报告', curMrCat='每月水质监测', sludgeSub='prod', chemSub='day';
+var sludgePeriod={mode:'month',ym:thisMonth()};
 function go(v,sub){
   document.querySelectorAll('.view').forEach(function(e){e.classList.remove('active');});
   document.getElementById('view-'+v).classList.add('active');
@@ -1337,8 +1338,9 @@ function exportChlorine(){
   }
   download(csv,'加氯量表_'+ym+'.csv','text/csv');
 }
-function renderGenericLedger(cat,targetId){
-  var cfg=LEDGERS[cat],rows=DB.ledgers[cat]||[];
+function renderGenericLedger(cat,targetId,period){
+  var cfg=LEDGERS[cat];
+  var rows=(period?(DB.ledgers[cat]||[]).filter(function(r){return inPeriod(r.date,period.mode,period.ym);}):DB.ledgers[cat])||[];
   var disp=cfg.disp?cfg.fields.filter(function(f){return cfg.disp.indexOf(f.k)>=0;}):cfg.fields;
   var idP='lf_'+cat+'_';                 /* 不同台账类目 id 前缀隔离，避免隐藏视图中的同名 input 被误读 */
   var h='<div class="grid3" style="margin-bottom:10px">';
@@ -1549,11 +1551,13 @@ function renderSludge(){
     +'</div>';
   h+='<div class="row" style="margin-bottom:14px"><span class="muted">2026年初初始库存基数(T)（仅最早月份用）：</span><input type="number" id="sludgeBase" style="width:120px" value="'+num(DB.settings.sludgeBase)+'" onchange="DB.settings.sludgeBase=num(this.value);save();renderSludge()"><button class="btn ghost sm" onclick="sludgeCalcAvg()">平均反推每日板框产泥量</button></div>';
   if(sludgeSub==='prod'){
+    h+=sludgePeriodBar();
     document.getElementById('sludgeBody').innerHTML=h+'<div id="sludgeSubBody"></div>';
-    renderGenericInto('sludge','sludgeSubBody');
+    renderGenericInto('sludge','sludgeSubBody',sludgePeriod);
   }else if(sludgeSub==='transfer'){
+    h+=sludgePeriodBar();
     document.getElementById('sludgeBody').innerHTML=h+'<div id="sludgeSubBody"></div>';
-    renderGenericInto('transfer','sludgeSubBody');
+    renderGenericInto('transfer','sludgeSubBody',sludgePeriod);
   }else if(sludgeSub==='calc'){
     document.getElementById('sludgeBody').innerHTML=h;
     renderSludgeCalc();
@@ -1569,8 +1573,8 @@ function renderSludge(){
     document.getElementById('sludgeBody').innerHTML=h;
   }
 }
-function renderGenericInto(cat,elId){
-  renderGenericLedger(cat,elId);
+function renderGenericInto(cat,elId,period){
+  renderGenericLedger(cat,elId,period);
 }
 function uploadSludgeDoc(inp){
   var files=Array.prototype.slice.call(inp.files),done=0;
@@ -1651,6 +1655,31 @@ function sludgeCalcAvg(){
   }
   save();renderSludge();
   toast('已平均分摊本月板框产泥量 '+fmt(b.plate)+' T（'+avg+' T/天，新建 '+added+' 天）');
+}
+/* 污泥管理导出周期选择器（月度/季度/年度） */
+function sludgePeriodBar(){
+  return '<div class="row" style="margin-bottom:12px">'
+    +'<div class="fld" style="width:150px"><label>统计周期</label><select onchange="sludgePeriod.mode=this.value;renderSludge()">'
+    +'<option value="month"'+(sludgePeriod.mode==='month'?' selected':'')+'>月度</option>'
+    +'<option value="quarter"'+(sludgePeriod.mode==='quarter'?' selected':'')+'>季度</option>'
+    +'<option value="year"'+(sludgePeriod.mode==='year'?' selected':'')+'>年度</option></select></div>'
+    +'<div class="fld" style="width:200px"><label>选择期间</label><input type="month" value="'+sludgePeriod.ym+'" onchange="sludgePeriod.ym=this.value;renderSludge()"></div>'
+    +'<span class="muted" style="align-self:flex-end">按所选周期筛选并显示 / 导出记录</span></div>';
+}
+/* 按周期导出指定台账（产泥记录 / 污泥转运） */
+function exportLedgerPeriod(cat,mode,ym){
+  var cfg=LEDGERS[cat];
+  var rows=(DB.ledgers[cat]||[]).filter(function(r){return inPeriod(r.date,mode,ym);});
+  if(!rows.length){toast('该期间暂无'+cfg.name+'记录');return;}
+  var cols=cfg.fields.map(function(f){return f.l;});
+  if(cfg.computed)cfg.computed.forEach(function(c){cols.push(c.l);});
+  var csv='﻿'+periodName(mode,ym)+cfg.name+'\n'+cols.join(',')+'\n';
+  rows.forEach(function(r){
+    var line=cfg.fields.map(function(f){return String(r[f.k]==null?'':r[f.k]).replace(/,/g,'，');});
+    if(cfg.computed)cfg.computed.forEach(function(c){line.push(c.fn(r));});
+    csv+=line.join(',')+'\n';
+  });
+  download(csv,periodSlug(mode,ym)+'_'+cfg.name+'.csv','text/csv');
 }
 
 /* ================= 药剂台账（每日用量/月度库存） ================= */
