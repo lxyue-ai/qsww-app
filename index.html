@@ -583,13 +583,14 @@ var IMPORT2026={"water": [{"date": "2026-01-01", "inflow": 13106.0, "outflow": 1
 /* ================= 数据层 ================= */
 var KEY='wb_qsww_db';
 var DB=null;
-function blank(){return {reports:[],ledgers:{water:[],production:[],chemical:[],chemStock:[],electric:[],sludge:[],transfer:[],reduction:[],dispatch:[],abnormal:[],overflow:[],invoice:[],lab:[],docentry:[]},files:[],monitor:{},settings:{sludgeBase:0},sample:false,imported2026:false};}
+function blank(){return {reports:[],ledgers:{water:[],production:[],chemical:[],chemStock:[],electric:[],sludge:[],transfer:[],reduction:[],dispatch:[],abnormal:[],overflow:[],invoice:[],lab:[],docentry:[]},files:[],monitor:{},settings:{sludgeBase:0,sludgeOpen:{}},sample:false,imported2026:false};}
 function migrate(){
   var b=blank();
   for(var k in b.ledgers)if(!DB.ledgers[k])DB.ledgers[k]=[];
   for(var k in LEDGERS)if(!LEDGERS[k].hidden&&!LEDGERS[k].computed&&!DB.ledgers[k])DB.ledgers[k]=[];
   if(!DB.monitor)DB.monitor={};
-  if(!DB.settings)DB.settings={sludgeBase:0};
+  if(!DB.settings)DB.settings={sludgeBase:0,sludgeOpen:{}};
+  if(!DB.settings.sludgeOpen)DB.settings.sludgeOpen={};
   if(DB.files==null)DB.files=[];
   if(DB.reports==null)DB.reports=[];
 }
@@ -665,20 +666,30 @@ function renderToday(){
 /* ================= 驾驶舱 ================= */
 function sumRows(rows,key){var s=0;rows.forEach(function(r){s+=num(r[key]);});return s;}
 function monthRows(cat,ym,dk){return DB.ledgers[cat].filter(function(r){return (r[dk||'date']||'').slice(0,7)===ym;});}
-function sludgeStock(){
-  /* 返回 {上月剩余, 本月产生, 本月转运, 本月剩余}，单位 T */
-  var ym=thisMonth(),pm=prevMonth(ym),base=num(DB.settings.sludgeBase);
-  var prodAll=0,tranAll=0,prodPrev=0,tranPrev=0,prodM=0,tranM=0;
-  DB.ledgers.sludge.forEach(function(r){var v=num(r.cake);prodAll+=v;if(r.date<ym)prodPrev+=v;if(r.date.slice(0,7)===ym)prodM+=v;});
-  DB.ledgers.transfer.forEach(function(r){var v=num(r.net);tranAll+=v;if(r.date<ym)tranPrev+=v;if(r.date.slice(0,7)===ym)tranM+=v;});
-  return {last:base+prodPrev-tranPrev, prod:prodM, tran:tranM, left:base+prodAll-tranAll};
+function sludgeProdVal(r){return num(r.plate)||num(r.cake);}
+function sludgeOpenOf(ym){
+  /* 某月月初初始库存（=上月末剩余）。优先用按月登记 sludgeOpen[ym]，否则按全局年初基数+此前各月(产生-转运)回退 */
+  var so=DB.settings.sludgeOpen||{};
+  if(so[ym]!=null&&so[ym]!=='')return num(so[ym]);
+  var base=num(DB.settings.sludgeBase),pb=0,tb=0;
+  DB.ledgers.sludge.forEach(function(r){if(r.date.slice(0,7)<ym)pb+=sludgeProdVal(r);});
+  DB.ledgers.transfer.forEach(function(r){if(r.date.slice(0,7)<ym)tb+=num(r.net);});
+  return base+pb-tb;
+}
+function sludgeStock(ym){
+  /* 返回 {open:本月初始库存, prod:本月产生, tran:本月转运, left:本月剩余}，单位 T */
+  ym=ym||thisMonth();
+  var open=sludgeOpenOf(ym),prodM=0,tranM=0;
+  DB.ledgers.sludge.forEach(function(r){if(r.date.slice(0,7)===ym)prodM+=sludgeProdVal(r);});
+  DB.ledgers.transfer.forEach(function(r){if(r.date.slice(0,7)===ym)tranM+=num(r.net);});
+  return {open:open, prod:prodM, tran:tranM, left:Math.round((open+prodM-tranM)*1000)/1000};
 }
 function periodSludge(a,b){
   /* a,b 为起止 ym（YYYY-MM）；返回期内产生/转运及期初/期末剩余，单位 T */
-  var base=num(DB.settings.sludgeBase),prodBefore=0,tranBefore=0,prodIn=0,tranIn=0;
-  DB.ledgers.sludge.forEach(function(r){var v=num(r.cake),ym=r.date.slice(0,7);if(ym<a)prodBefore+=v;else if(ym>=a&&ym<=b)prodIn+=v;});
-  DB.ledgers.transfer.forEach(function(r){var v=num(r.net),ym=r.date.slice(0,7);if(ym<a)tranBefore+=v;else if(ym>=a&&ym<=b)tranIn+=v;});
-  return {last:base+prodBefore-tranBefore, prod:prodIn, tran:tranIn, left:base+prodBefore+prodIn-tranBefore-tranIn};
+  var open=sludgeOpenOf(a),prodIn=0,tranIn=0;
+  DB.ledgers.sludge.forEach(function(r){var v=sludgeProdVal(r),ym=r.date.slice(0,7);if(ym>=a&&ym<=b)prodIn+=v;});
+  DB.ledgers.transfer.forEach(function(r){var v=num(r.net),ym=r.date.slice(0,7);if(ym>=a&&ym<=b)tranIn+=v;});
+  return {last:open, prod:prodIn, tran:tranIn, left:Math.round((open+prodIn-tranIn)*1000)/1000};
 }
 /* ===== 驾驶舱周期切换 ===== */
 var dashDim='month', dashSel=null;
@@ -1269,7 +1280,7 @@ var LEDGERS={
  ]},
  overflow:{name:'溢流报告',red:true,fields:[{k:'date',l:'日期',t:'date'},{k:'reason',l:'溢流原因',t:'text'},{k:'open',l:'开阀时间',t:'datetime-local'},{k:'openFlow',l:'开阀进水流量(m³/h)'},{k:'openLevel',l:'开阀集水井液位(m)'},{k:'close',l:'关阀时间',t:'datetime-local'},{k:'closeFlow',l:'关阀进水流量(m³/h)'},{k:'closeLevel',l:'关阀集水井液位(m)'},{k:'status',l:'状态',t:'sel',opts:['已闭环','未闭环']}],
   computed:[{l:'溢流时长',fn:function(r){if(!r.open||!r.close)return '-';var ms=new Date(r.close)-new Date(r.open);if(ms<0)return '-';return Math.floor(ms/3600000)+'小时'+Math.round(ms%3600000/60000)+'分钟';}}]},
- sludge:{name:'污泥台账',fields:[{k:'date',l:'日期',t:'date'},{k:'cake',l:'泥饼量(T)'},{k:'hours',l:'脱水机运行(h)'},{k:'dest',l:'处置去向',t:'text'}]},
+ sludge:{name:'污泥台账',fields:[{k:'date',l:'日期',t:'date'},{k:'plate',l:'板框产泥量(T)'},{k:'cake',l:'泥饼量(T)'},{k:'hours',l:'脱水机运行(h)'},{k:'dest',l:'处置去向',t:'text'}]},
  transfer:{name:'污泥转运',hidden:true,attach:'过磅单',fields:[{k:'date',l:'转运日期',t:'date'},{k:'net',l:'净重(T)'},{k:'plate',l:'车牌号',t:'text'},{k:'driver',l:'运输人员',t:'text'},{k:'note',l:'备注',t:'text'}]},
  electric:{name:'电费台账',attach:'发票',fields:[{k:'month',l:'月份',t:'month'},{k:'oldKwh',l:'老厂用电量(度)'},{k:'oldFee',l:'老厂电费(元)'},{k:'newKwh',l:'新厂用电量(度)'},{k:'newFee',l:'新厂电费(元)'},{k:'note',l:'备注',t:'text'}]},
  chemical:{name:'药剂台账(kg)',fields:[{k:'date',l:'日期',t:'date'},{k:'pac',l:'PAC'},{k:'c10',l:'次氯酸钠'},{k:'salt',l:'无碘盐'},{k:'carbon',l:'复合碳源'},{k:'pam',l:'PAM'},{k:'fe',l:'铁盐'},{k:'lime',l:'石灰'}]},
@@ -1340,7 +1351,7 @@ function renderGenericLedger(cat,targetId){
     else inp='<input type="number" id="lf_'+f.k+'" inputmode="decimal"'+(cfg.autoNet&&(f.k==='gross'||f.k==='tare')?' oninput="calcNet()"':'')+'>';
     h+='<div class="fld"'+(f.t==='ta'?' style="grid-column:1/-1"':'')+'><label>'+f.l+'</label>'+inp+'</div>';
   });
-  h+='</div><div class="row" style="margin-bottom:14px"><button class="btn" id="ledgerAddBtn" onclick="addLedgerRow(\''+cat+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>'+(curEdit.cat===cat?'保存修改':'添加记录')+'</button>'+(curEdit.cat===cat?'<button class="btn ghost" onclick="cancelLedgerEdit()">取消</button>':'')+'<button class="btn ghost" onclick="exportCSV(\''+cat+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button></div>';
+  h+='</div><div class="row" style="margin-bottom:14px"><button class="btn" id="ledgerAddBtn" onclick="addLedgerRow(\''+cat+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>'+(curEdit.cat===cat?'保存修改':'添加记录')+'</button>'+(curEdit.cat===cat?'<button class="btn ghost" onclick="cancelLedgerEdit()">取消</button>':'')+(IMPORT_MAP[cat]?'<button class="btn ghost" onclick="openImport(\''+cat+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导入表格</button>':'')+'<button class="btn ghost" onclick="exportCSV(\''+cat+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button></div>';
   h+='<div class="tbwrap"><table class="tb"><thead><tr>';
   disp.forEach(function(f){h+='<th>'+f.l+'</th>';});
   if(cfg.computed)cfg.computed.forEach(function(c){h+='<th>'+c.l+'</th>';});
@@ -1514,27 +1525,31 @@ function viewImg(cat,id){
   document.getElementById('viewerImg').src=r.img;document.getElementById('viewer').classList.add('show');
 }
 
-/* ================= 污泥台账（含转运/三联单/库存） ================= */
+/* ================= 污泥台账（含转运/三联单/库存/板框产泥计算） ================= */
 function renderSludge(){
   var sk=sludgeStock();
   var h='<div class="subtabs">'
     +'<button class="subtab'+(sludgeSub==='prod'?' active':'')+'" onclick="sludgeSub=\'prod\';renderSludge()">产泥记录</button>'
     +'<button class="subtab'+(sludgeSub==='transfer'?' active':'')+'" onclick="sludgeSub=\'transfer\';renderSludge()">污泥转运</button>'
     +'<button class="subtab'+(sludgeSub==='docs'?' active':'')+'" onclick="sludgeSub=\'docs\';renderSludge()">转运三联单</button>'
+    +'<button class="subtab'+(sludgeSub==='calc'?' active':'')+'" onclick="sludgeSub=\'calc\';renderSludge()">板框产泥计算</button>'
     +'</div>';
   h+='<div class="sludge-bar">'
-    +'<div class="stat-card"><div class="v">'+fmt(sk.prod)+' T</div><div class="k">本月产生污泥量</div></div>'
+    +'<div class="stat-card"><div class="v">'+fmt(sk.prod)+' T</div><div class="k">本月板框产泥量</div></div>'
     +'<div class="stat-card"><div class="v">'+fmt(sk.tran)+' T</div><div class="k">本月转运污泥量</div></div>'
-    +'<div class="stat-card"><div class="v">'+fmt(sk.last)+' T</div><div class="k">上月剩余量</div></div>'
+    +'<div class="stat-card"><div class="v">'+fmt(sk.open)+' T</div><div class="k">本月初始库存</div></div>'
     +'<div class="stat-card"><div class="v'+(sk.left<0?' red':'')+'">'+fmt(sk.left)+' T</div><div class="k">本月剩余量</div></div>'
     +'</div>';
-  h+='<div class="row" style="margin-bottom:14px"><span class="muted">2026年初始库存基数(T)：</span><input type="number" id="sludgeBase" style="width:120px" value="'+num(DB.settings.sludgeBase)+'" onchange="DB.settings.sludgeBase=num(this.value);save();renderSludge()"><button class="btn ghost sm" onclick="backfillSludge()">按转运+库存反推每日板框产泥量</button></div>';
+  h+='<div class="row" style="margin-bottom:14px"><span class="muted">2026年初初始库存基数(T)（仅最早月份用）：</span><input type="number" id="sludgeBase" style="width:120px" value="'+num(DB.settings.sludgeBase)+'" onchange="DB.settings.sludgeBase=num(this.value);save();renderSludge()"><button class="btn ghost sm" onclick="sludgeCalcAvg()">平均反推每日板框产泥量</button></div>';
   if(sludgeSub==='prod'){
     document.getElementById('sludgeBody').innerHTML=h+'<div id="sludgeSubBody"></div>';
     renderGenericInto('sludge','sludgeSubBody');
   }else if(sludgeSub==='transfer'){
     document.getElementById('sludgeBody').innerHTML=h+'<div id="sludgeSubBody"></div>';
     renderGenericInto('transfer','sludgeSubBody');
+  }else if(sludgeSub==='calc'){
+    document.getElementById('sludgeBody').innerHTML=h;
+    renderSludgeCalc();
   }else{
     h+='<div class="upzone" onclick="document.getElementById(\'sld_input\').click()">'
       +'<svg class="ic" viewBox="0 0 24 24" style="width:28px;height:28px;margin-bottom:6px"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="4"/></svg>'
@@ -1562,23 +1577,73 @@ function uploadSludgeDoc(inp){
   });
 }
 function delFileSludge(id){DB.files=DB.files.filter(function(x){return x.id!==id;});save();renderSludge();toast('已删除');}
-function backfillSludge(){
-  var ym=thisMonth(),sk=sludgeStock();
-  var daysInMonth=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
-  var need=sk.tran+sk.left-sk.last;
-  if(need<=0){toast('本月转运+剩余-上月剩余 ≤ 0，无需反推');return;}
-  var avg=Math.round(need/daysInMonth*100)/100;
+/* ===== 板框产泥计算板块 ===== */
+var sludgeCalcYm=null, sludgeCalcEnd={};
+function renderSludgeCalc(){
+  var ym=sludgeCalcYm||thisMonth();
+  var sk=sludgeStock(ym);
+  var open=Math.round(sk.open*1000)/1000;
+  var tran=Math.round(sk.tran*1000)/1000;
+  var end=sludgeCalcEnd[ym]; if(end==null)end=Math.round(sk.left*1000)/1000;
+  var plate=Math.round((num(end)+tran-open)*1000)/1000;
+  var y=+ym.slice(0,4),m=+ym.slice(5,7),dim=new Date(y,m,0).getDate(),totOut=0;
+  for(var d=1;d<=dim;d++){var ds=ym+'-'+('0'+d).slice(-2);var w=DB.ledgers.water.find(function(r){return r.date===ds;});if(w)totOut+=num(w.outflow);}
+  var h='<div class="section-note">根据「本月初始库存(上月末剩余) + 本月转运量 + 本月剩余量」反算<b>本月板框产泥量</b>；再用「出水量比例」把月度总量分摊到每日，自动回填到产泥记录的「板框产泥量(T)」。</div>';
+  h+='<div class="row" style="margin-bottom:12px"><div class="fld" style="width:200px"><label>统计月份</label><input type="month" value="'+ym+'" onchange="sludgeCalcYm=this.value;sludgeCalcEnd[sludgeCalcYm]=null;renderSludge()"></div>'
+    +'<button class="btn ghost" onclick="sludgeSub=\'prod\';renderSludge()">去产泥记录查看</button></div>';
+  h+='<div class="grid3" style="margin-bottom:10px">'
+    +'<div class="fld"><label>本月初始库存(T)（期初=上月末剩余，按月登记）</label><input type="number" id="scOpen" value="'+open+'" onchange="DB.settings.sludgeOpen=DB.settings.sludgeOpen||{};DB.settings.sludgeOpen[\''+ym+'\']=num(this.value);save();renderSludge()"></div>'
+    +'<div class="fld"><label>本月转运量(T)（自动合计）</label><input type="number" value="'+tran+'" readonly style="background:var(--blue-xl)"></div>'
+    +'<div class="fld"><label>本月剩余量(T)（期末，请填实际过磅）</label><input type="number" id="scEnd" value="'+end+'" onchange="sludgeCalcEnd[\''+ym+'\']=num(this.value);renderSludge()"></div>'
+    +'</div>';
+  h+='<div class="stat-card" style="margin-bottom:14px"><div class="v'+(plate<0?' red':'')+'">'+fmt(plate)+' T</div><div class="k">本月板框产泥量 = 期末 + 转运 − 期初</div></div>';
+  h+='<div class="row" style="margin-bottom:12px"><button class="btn" onclick="sludgeCalcByOutflow()"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13"/></svg>按出水量比例反推每日板框产泥量</button>'
+    +'<button class="btn ghost" onclick="sludgeCalcAvg()">平均反推每日</button></div>';
+  h+='<div class="muted">本月出水量合计 '+fmt(totOut)+' m³'+(totOut>0?'，将按各日出水量占比把 '+fmt(plate)+' T 板框产泥量分摊到每日产泥记录。':'，请先在「水量台账」录入本月出水量后再用此功能。')+'</div>';
+  document.getElementById('sludgeBody').innerHTML=h;
+}
+function sludgeCalcBase(ym){
+  var sk=sludgeStock(ym);
+  var open=sk.open,tran=sk.tran;
+  var end=sludgeCalcEnd[ym]; if(end==null)end=sk.left;
+  var plate=num(end)+tran-open;
+  return {plate:plate,ym:ym};
+}
+function sludgeCalcByOutflow(){
+  var ym=sludgeCalcYm||thisMonth();
+  var b=sludgeCalcBase(ym);
+  if(b.plate<=0){toast('本月板框产泥量 ≤ 0，请检查期初/期末/转运量');return;}
+  var y=+ym.slice(0,4),m=+ym.slice(5,7),dim=new Date(y,m,0).getDate();
+  var outs={},tot=0,days=[];
+  for(var d=1;d<=dim;d++){var ds=ym+'-'+('0'+d).slice(-2);var w=DB.ledgers.water.find(function(r){return r.date===ds;});var o=w?num(w.outflow):0;outs[ds]=o;if(o>0){tot+=o;days.push(ds);}}
+  if(!days.length){toast('本月水量台账无出水量数据，无法按比例分摊；请用「平均反推」');return;}
+  var alloc={},used=0;
+  days.forEach(function(ds,i){var share=(i===days.length-1)?Math.round((b.plate-used)*100)/100:Math.round(b.plate*outs[ds]/tot*100)/100;alloc[ds]=share;used+=share;});
   var added=0;
-  for(var d=1;d<=daysInMonth;d++){
-    var ds=ym+'-'+String(d).padStart(2,'0');
+  days.forEach(function(ds){
+    var rec=DB.ledgers.sludge.find(function(r){return r.date===ds;});
+    if(!rec){rec={id:uid(),date:ds,cake:'',hours:'',dest:''};DB.ledgers.sludge.push(rec);added++;}
+    rec.plate=alloc[ds];
+  });
+  save();renderSludge();
+  toast('已按出水量比例分摊本月板框产泥量 '+fmt(b.plate)+' T 到 '+days.length+' 天（新建 '+added+' 天，其余已更新）');
+}
+function sludgeCalcAvg(){
+  var ym=sludgeCalcYm||thisMonth();
+  var b=sludgeCalcBase(ym);
+  if(b.plate<=0){toast('本月板框产泥量 ≤ 0，请检查期初/期末/转运量');return;}
+  var y=+ym.slice(0,4),m=+ym.slice(5,7),dim=new Date(y,m,0).getDate();
+  var avg=Math.round(b.plate/dim*100)/100;
+  var added=0;
+  for(var d=1;d<=dim;d++){
+    var ds=ym+'-'+('0'+d).slice(-2);
     if(ds>todayStr())break;
-    if(!DB.ledgers.sludge.some(function(r){return r.date===ds;})){
-      DB.ledgers.sludge.push({id:uid(),date:ds,cake:avg,hours:'',dest:'（按转运反推）'});
-      added++;
-    }
+    var rec=DB.ledgers.sludge.find(function(r){return r.date===ds;});
+    if(!rec){rec={id:uid(),date:ds,cake:'',hours:'',dest:''};DB.ledgers.sludge.push(rec);added++;}
+    rec.plate=avg;
   }
   save();renderSludge();
-  toast('反推日均板框产泥量 '+avg+' T/天，已补齐 '+added+' 天记录（可手动修正）');
+  toast('已平均分摊本月板框产泥量 '+fmt(b.plate)+' T（'+avg+' T/天，新建 '+added+' 天）');
 }
 
 /* ================= 药剂台账（每日用量/月度库存） ================= */
@@ -1644,7 +1709,7 @@ var STAT_CFG={
  production:{src:'production',cols:[{k:'inflow',l:'进水量(m³)'},{k:'outflow',l:'出水量(m³)'},{k:'chem',l:'药剂量(kg)'},{k:'cake',l:'泥饼量(T)'},{k:'hours',l:'脱泥机运行(h)'},{k:'power',l:'用电量(kW·h)'}],dk:'date'},
  chemical:{src:'chemical',cols:[{k:'pac',l:'PAC(kg)'},{k:'c10',l:'次氯酸钠(kg)'},{k:'salt',l:'无碘盐(kg)'},{k:'carbon',l:'复合碳源(kg)'},{k:'pam',l:'PAM(kg)'},{k:'fe',l:'铁盐(kg)'},{k:'lime',l:'石灰(kg)'}],dk:'date'},
  electric:{src:'electric',cols:[{k:'oldKwh',l:'老厂用电量(度)'},{k:'oldFee',l:'老厂电费(元)'},{k:'newKwh',l:'新厂用电量(度)'},{k:'newFee',l:'新厂电费(元)'}],dk:'month'},
- sludge:{src:'sludge',cols:[{k:'cake',l:'泥饼量(T)'},{k:'hours',l:'脱水机运行(h)'}],dk:'date'},
+ sludge:{src:'sludge',cols:[{k:'plate',l:'板框产泥量(T)'},{k:'cake',l:'泥饼量(T)'},{k:'hours',l:'脱水机运行(h)'}],dk:'date'},
  transfer:{src:'transfer',cols:[{k:'net',l:'净重(T)'}],dk:'date'},
  reduction:{src:'reduction',cols:[{k:'blower',l:'鼓风机(h)'},{k:'pump',l:'提升泵(h)'},{k:'dewat',l:'污泥脱水机(h)'},{k:'decant',l:'滗水器(h)'}],dk:'date'}
 };
@@ -2276,7 +2341,7 @@ var IMPORT_MAP={
  chemical:{date:['日期'],pac:['pac'],c10:['次氯酸钠','消毒'],salt:['无碘盐','工业盐','盐'],carbon:['复合碳源','碳源'],pam:['pam'],fe:['铁盐'],lime:['石灰']},
  lab:{date:['日期'],sample:['水样'],time:['取样','时间'],cod:['cod'],nh3:['氨氮','nh3'],tp:['总磷','tp'],tn:['总氮','tn'],ss:['ss'],bod:['bod'],sv30:['sv30'],mlss:['mlss'],water:['含水率']},
  reduction:{date:['日期'],blower:['鼓风机'],pump:['提升泵'],dewat:['脱水'],decant:['滗水']},
- sludge:{date:['日期'],cake:['泥饼','总产泥量','产泥量'],hours:['运行','脱泥','脱水'],dest:['处置','去向']},
+ sludge:{date:['日期'],plate:['板框产泥量','板框产泥','板框'],cake:['泥饼','总产泥量','产泥量'],hours:['运行','脱泥','脱水'],dest:['处置','去向']},
  invoice:{date:['日期'],type:['类型','发票类型'],amount:['金额'],no:['票号','发票号','发票号码'],note:['备注']},
  dispatch:{date:['日期'],shift:['班次'],content:['调度内容','内容'],person:['执行人'],status:['完成情况','状态']},
  docentry:{date:['日期'],toOrg:['主送机关','主送'],ccOrg:['抄送'],docNo:['发文字号','文号'],summary:['摘由','摘要']},
@@ -2603,7 +2668,8 @@ function confirmImport(){
   var recs=impState.preview||[];
   if(!recs.length){impErr('没有可导入的数据。');return;}
   var res=mergeImport(impState.cat,recs);
-  save();closeImport();renderLedger();
+  save();closeImport();
+  if(impState.cat==='transfer'||impState.cat==='sludge')renderSludge();else renderLedger();
   toast('导入完成：新增 '+res.added+' 条，更新 '+res.updated+' 条');
 }
 
