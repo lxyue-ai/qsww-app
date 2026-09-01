@@ -477,6 +477,7 @@ table.tb tbody tr:hover{background:var(--blue-xl)}
             <option value="water">水量报表</option>
             <option value="production">生产量报表</option>
             <option value="chemical">药剂用量报表</option>
+            <option value="chlorine">加氯量表</option>
             <option value="electric">电费报表</option>
             <option value="sludge">产泥报表</option>
             <option value="transfer">污泥转运报表</option>
@@ -1338,6 +1339,74 @@ function exportChlorine(){
   }
   download(csv,'加氯量表_'+ym+'.csv','text/csv');
 }
+/* 报表中心加氯量表（支持月度/季度/年度） */
+function chlorineRows(ym){
+  var y=+ym.slice(0,4),m=+ym.slice(5,7),daysInMonth=new Date(y,m,0).getDate();
+  var rows=[],sumW=0,sumC=0;
+  for(var d=1;d<=daysInMonth;d++){
+    var ds=ym+'-'+String(d).padStart(2,'0');
+    var rec=DB.ledgers.water.find(function(r){return r.date===ds;});
+    var w=rec?num(rec.inflow):null;
+    var c=w!=null?Math.round(w*7/1000*1000)/1000:null;
+    if(w!=null){sumW+=w;sumC+=c;}
+    rows.push({d:d,ds:ds,w:w,c:c});
+  }
+  return {y:y,m:m,daysInMonth:daysInMonth,rows:rows,sumW:sumW,sumC:sumC,n:rows.filter(function(r){return r.w!=null;}).length};
+}
+function chlorineAggMonth(mo){
+  var d=chlorineRows(mo);
+  return {m:+mo.slice(5,7),y:+mo.slice(0,4),sumW:d.sumW,sumC:d.sumC,n:d.n};
+}
+function renderChlorineReport(ym,mode){
+  mode=mode||'month';
+  var pn=periodName(mode,ym);
+  if(mode==='month'){
+    var d=chlorineRows(ym);
+    var h='<h2 style="margin-bottom:6px;text-align:center">加氯间加氯量记录表（'+pn+'）</h2>';
+    h+='<div class="section-note">水量取自水量台账每日进水量，工业盐用量 = 水量 × 7 / 1000。</div>';
+    h+='<div class="tbwrap"><table class="tb water-rpt"><thead><tr><th>日期</th><th>水量（m³）</th><th>工业盐用量（kg）</th></tr></thead><tbody>';
+    d.rows.forEach(function(r){h+='<tr><td>'+r.d+'日</td><td>'+(r.w!=null?fmt(r.w):'<span class="muted">-</span>')+'</td><td>'+(r.c!=null?fmt(r.c):'<span class="muted">-</span>')+'</td></tr>';});
+    h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fmt(d.sumW)+'</td><td>'+fmt(Math.round(d.sumC*1000)/1000)+'</td></tr>';
+    h+='</tbody></table></div>';
+    h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportChlorineReport(\''+ym+'\',\'month\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button></div>';
+    document.getElementById('statsBody').innerHTML=h;
+    return;
+  }
+  var months=monthsInPeriod(mode,ym);
+  var list=months.map(function(mo){return chlorineAggMonth(mo);}).filter(function(a){return a.n>0;});
+  var grandW=0,grandC=0;
+  list.forEach(function(a){grandW+=a.sumW;grandC+=a.sumC;});
+  var h='<h2 style="margin-bottom:6px;text-align:center">加氯间加氯量记录表（'+pn+'汇总）</h2>';
+  h+='<div class="section-note">按所选周期逐月汇总：水量取自水量台账每日进水量，工业盐用量 = 水量 × 7 / 1000。</div>';
+  if(!list.length){h+='<div class="muted">该期间暂无数据，请先在「水量台账」录入或导入每日水量。</div>';}
+  else{
+    h+='<div class="tbwrap"><table class="tb water-rpt"><thead><tr><th>月份</th><th>水量合计（m³）</th><th>工业盐用量合计（kg）</th><th>有数据天数</th><th>日均水量（m³）</th></tr></thead><tbody>';
+    list.forEach(function(a){h+='<tr><td>'+a.y+'年'+a.m+'月</td><td>'+fmt(a.sumW)+'</td><td>'+fmt(Math.round(a.sumC*1000)/1000)+'</td><td>'+a.n+'</td><td>'+fmt(Math.round(a.sumW/a.n*100)/100)+'</td></tr>';});
+    h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fmt(grandW)+'</td><td>'+fmt(Math.round(grandC*1000)/1000)+'</td><td>'+list.reduce(function(s,a){return s+a.n;},0)+'</td><td>-</td></tr>';
+    h+='</tbody></table></div>';
+  }
+  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportChlorineReport(\''+ym+'\',\''+mode+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button></div>';
+  document.getElementById('statsBody').innerHTML=h;
+}
+function exportChlorineReport(ym,mode){
+  mode=mode||'month';
+  var pn=periodName(mode,ym),slug=periodSlug(mode,ym);
+  if(mode==='month'){
+    var d=chlorineRows(ym);
+    var csv='﻿加氯间加氯量记录表（'+pn+'）\n日期,水量（m³）,工业盐用量（kg）\n';
+    d.rows.forEach(function(r){if(r.w!=null)csv+=r.d+','+r.w+','+r.c+'\n';});
+    csv+='合计,'+d.sumW+','+(Math.round(d.sumC*1000)/1000)+'\n';
+    download(csv,'加氯量表_'+slug+'.csv','text/csv');
+  }else{
+    var months=monthsInPeriod(mode,ym);
+    var list=months.map(function(mo){return chlorineAggMonth(mo);}).filter(function(a){return a.n>0;});
+    var csv='﻿加氯间加氯量记录表（'+pn+'汇总）\n月份,水量合计（m³）,工业盐用量合计（kg）,有数据天数,日均水量（m³）\n';
+    var grandW=0,grandC=0;
+    list.forEach(function(a){csv+=a.y+'年'+a.m+'月,'+a.sumW+','+(Math.round(a.sumC*1000)/1000)+','+a.n+','+(Math.round(a.sumW/a.n*100)/100)+'\n';grandW+=a.sumW;grandC+=a.sumC;});
+    csv+='合计,'+grandW+','+(Math.round(grandC*1000)/1000)+','+list.reduce(function(s,a){return s+a.n;},0)+',-\n';
+    download(csv,'加氯量表_'+slug+'_汇总.csv','text/csv');
+  }
+}
 function renderGenericLedger(cat,targetId,period){
   var cfg=LEDGERS[cat];
   var rows=(period?(DB.ledgers[cat]||[]).filter(function(r){return inPeriod(r.date,period.mode,period.ym);}):DB.ledgers[cat])||[];
@@ -1882,6 +1951,7 @@ function renderStats(){
   var type=document.getElementById('s_type').value,mode=document.getElementById('s_period').value;
   var ym=document.getElementById('s_month').value||thisMonth();
   if(type==='water'){renderWaterReport(ym,mode);return;}
+  if(type==='chlorine'){renderChlorineReport(ym,mode);return;}
   if(type==='sched'){renderSched(ym);return;}
   if(type==='redRep'){renderRedRep(ym);return;}
   if(type==='selfCheck'){renderSelfCheck(ym);return;}
@@ -2210,6 +2280,7 @@ function exportSelfCheckDoc(ym){
 function exportStatsCSV(){
   var type=document.getElementById('s_type').value,mode=document.getElementById('s_period').value;
   if(type==='water'){exportWaterCSV(document.getElementById('s_month').value||thisMonth(),mode);return;}
+  if(type==='chlorine'){exportChlorineReport(document.getElementById('s_month').value||thisMonth(),mode);return;}
   if(type==='sched'){exportSchedCSV(document.getElementById('s_month').value||thisMonth());return;}
   if(type==='redRep'){exportRedDoc(document.getElementById('s_month').value||thisMonth());return;}
   if(type==='selfCheck'){exportSelfCheckCSV(document.getElementById('s_month').value||thisMonth());return;}
