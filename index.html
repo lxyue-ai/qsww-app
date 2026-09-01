@@ -1651,6 +1651,7 @@ function renderSludge(){
     renderGenericInto('sludge','sludgeSubBody',sludgePeriod);
   }else if(sludgeSub==='transfer'){
     h+=sludgePeriodBar();
+    h+='<div class="row" style="margin-bottom:12px"><button class="btn ghost" onclick="dedupeLedger(\'transfer\')"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg>去除重复转运记录</button><span class="muted">同一天「日期/净重/车牌/司机/备注」完全一致的重复行将被合并为一条，避免转运量重复计算；真实多车（任一字段不同）会保留。</span></div>';
     document.getElementById('sludgeBody').innerHTML=h+'<div id="sludgeSubBody"></div>';
     renderGenericInto('transfer','sludgeSubBody',sludgePeriod);
   }else if(sludgeSub==='calc'){
@@ -2750,6 +2751,20 @@ function mergeImport(cat,recs){
     arr.push(rec); added++; batchAdded[k]=true;
   });
   return {added:added,updated:0,ignored:ignored};
+}
+/* 去除指定台账中「业务字段完全相同」的重复记录（如重复导入产生的同日同值冗余），仅保留一条，避免转运量/产泥量被重复计算。同日真实多车（任一字段不同）会保留，不会误删 */
+function dedupeLedger(cat){
+  var arr=DB.ledgers[cat]||[];
+  var flds=(LEDGERS[cat].fields||[]).map(function(f){return f.k;}).filter(function(k){return k!=='id';});
+  var seen={},keep=[],rm=0;
+  arr.forEach(function(r){
+    var key=flds.map(function(k){return (r[k]==null?'':(''+r[k]).trim());}).join('\u0001');
+    if(seen[key]){rm++;}
+    else{seen[key]=true;keep.push(r);}
+  });
+  if(rm){DB.ledgers[cat]=keep;save();}
+  if(cat==='transfer'||cat==='sludge')renderSludge();else renderLedger();
+  toast(rm?('已去除 '+rm+' 条重复记录，剩余 '+keep.length+' 条'+LEDGERS[cat].name+'记录'):(LEDGERS[cat].name+'未发现完全重复的记录'));
 }
 function openImport(cat){
   impState={cat:cat};
