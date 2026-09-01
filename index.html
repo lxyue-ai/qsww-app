@@ -1632,6 +1632,8 @@ function renderSludge(){
   var mode=(sludgePeriod&&sludgePeriod.mode)||'month',ym=(sludgePeriod&&sludgePeriod.ym)||thisMonth();
   var sk=sludgeStockPeriod(mode,ym);
   var labelPrefix=mode==='month'?'本月':mode==='quarter'?'本季度':'本年度';
+  var openLabel=mode==='month'?'本月初始库存':mode==='quarter'?'季初初始库存':'年初初始库存';
+  var openNote=mode==='month'?'（期初=上月末剩余）':mode==='quarter'?'（季度首月期初库存）':'（1月1日期初库存，取自上方基数）';
   var h='<div class="subtabs">'
     +'<button class="subtab'+(sludgeSub==='prod'?' active':'')+'" onclick="sludgeSub=\'prod\';renderSludge()">产泥记录</button>'
     +'<button class="subtab'+(sludgeSub==='transfer'?' active':'')+'" onclick="sludgeSub=\'transfer\';renderSludge()">污泥转运</button>'
@@ -1641,8 +1643,8 @@ function renderSludge(){
   h+='<div class="sludge-bar">'
     +'<div class="stat-card"><div class="v">'+fmt(sk.prod)+' T</div><div class="k">'+labelPrefix+'板框产泥量</div></div>'
     +'<div class="stat-card"><div class="v">'+fmt(sk.tran)+' T</div><div class="k">'+labelPrefix+'转运污泥量</div></div>'
-    +'<div class="stat-card"><div class="v">'+fmt(sk.open)+' T</div><div class="k">'+labelPrefix+'初始库存</div></div>'
-    +'<div class="stat-card"><div class="v'+(sk.left<0?' red':'')+'">'+fmt(sk.left)+' T</div><div class="k">'+labelPrefix+'剩余量</div></div>'
+    +'<div class="stat-card"><div class="v">'+fmt(sk.open)+' T</div><div class="k">'+openLabel+'</div><div class="muted" style="font-size:11px;margin-top:4px">'+openNote+'</div></div>'
+    +'<div class="stat-card"><div class="v'+(sk.left<0?' red':'')+'">'+fmt(sk.left)+' T</div><div class="k">'+labelPrefix+'剩余量</div><div class="muted" style="font-size:11px;margin-top:4px">（期初+产泥-转运）</div></div>'
     +'</div>';
   h+='<div class="row" style="margin-bottom:14px"><span class="muted">2026年初初始库存基数(T)（仅最早月份用）：</span><input type="number" id="sludgeBase" style="width:120px" value="'+num(DB.settings.sludgeBase)+'" onchange="DB.settings.sludgeBase=num(this.value);save();renderSludge()"><button class="btn ghost sm" onclick="sludgeCalcAvg()">平均反推每日板框产泥量</button></div>';
   if(sludgeSub==='prod'){
