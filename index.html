@@ -668,7 +668,7 @@ function renderToday(){
 /* ================= 驾驶舱 ================= */
 function sumRows(rows,key){var s=0;rows.forEach(function(r){s+=num(r[key]);});return s;}
 function monthRows(cat,ym,dk){return DB.ledgers[cat].filter(function(r){return (r[dk||'date']||'').slice(0,7)===ym;});}
-function sludgeProdVal(r){return num(r.plate)||num(r.cake);}
+function sludgeProdVal(r){return (r.plate!=null&&r.plate!=='')?num(r.plate):num(r.cake);}
 function sludgeOpenOf(ym){
   /* 某月月初初始库存（=上月末剩余）。优先用按月登记 sludgeOpen[ym]，否则按全局年初基数+此前各月(产生-转运)回退 */
   var so=DB.settings.sludgeOpen||{};
@@ -685,6 +685,30 @@ function sludgeStock(ym){
   DB.ledgers.sludge.forEach(function(r){if(r.date.slice(0,7)===ym)prodM+=sludgeProdVal(r);});
   DB.ledgers.transfer.forEach(function(r){if(r.date.slice(0,7)===ym)tranM+=num(r.net);});
   return {open:open, prod:prodM, tran:tranM, left:Math.round((open+prodM-tranM)*1000)/1000};
+}
+/* 按月度/季度/年度聚合污泥库存统计 */
+function sludgeStockPeriod(mode,ym){
+  if(mode==='month')return sludgeStock(ym);
+  var y=+ym.slice(0,4),m=+ym.slice(5,7);
+  if(mode==='quarter'){
+    var q=Math.ceil(m/3),sm=(q-1)*3+1,em=sm+2;
+    var open=sludgeOpenOf(y+'-'+String(sm).padStart(2,'0'));
+    var prod=0,tran=0;
+    for(var mm=sm;mm<=em;mm++){
+      var mo=y+'-'+String(mm).padStart(2,'0');
+      DB.ledgers.sludge.forEach(function(r){if(r.date.slice(0,7)===mo)prod+=sludgeProdVal(r);});
+      DB.ledgers.transfer.forEach(function(r){if(r.date.slice(0,7)===mo)tran+=num(r.net);});
+    }
+    return {open:open,prod:Math.round(prod*1000)/1000,tran:Math.round(tran*1000)/1000,left:Math.round((open+prod-tran)*1000)/1000};
+  }
+  var open=sludgeOpenOf(y+'-01');
+  var prod=0,tran=0;
+  for(var mm=1;mm<=12;mm++){
+    var mo=y+'-'+String(mm).padStart(2,'0');
+    DB.ledgers.sludge.forEach(function(r){if(r.date.slice(0,7)===mo)prod+=sludgeProdVal(r);});
+    DB.ledgers.transfer.forEach(function(r){if(r.date.slice(0,7)===mo)tran+=num(r.net);});
+  }
+  return {open:open,prod:Math.round(prod*1000)/1000,tran:Math.round(tran*1000)/1000,left:Math.round((open+prod-tran)*1000)/1000};
 }
 function periodSludge(a,b){
   /* a,b 为起止 ym（YYYY-MM）；返回期内产生/转运及期初/期末剩余，单位 T */
@@ -1605,18 +1629,20 @@ function viewImg(cat,id){
 
 /* ================= 污泥台账（含转运/三联单/库存/板框产泥计算） ================= */
 function renderSludge(){
-  var sk=sludgeStock();
+  var mode=(sludgePeriod&&sludgePeriod.mode)||'month',ym=(sludgePeriod&&sludgePeriod.ym)||thisMonth();
+  var sk=sludgeStockPeriod(mode,ym);
+  var labelPrefix=mode==='month'?'本月':mode==='quarter'?'本季度':'本年度';
   var h='<div class="subtabs">'
     +'<button class="subtab'+(sludgeSub==='prod'?' active':'')+'" onclick="sludgeSub=\'prod\';renderSludge()">产泥记录</button>'
     +'<button class="subtab'+(sludgeSub==='transfer'?' active':'')+'" onclick="sludgeSub=\'transfer\';renderSludge()">污泥转运</button>'
     +'<button class="subtab'+(sludgeSub==='docs'?' active':'')+'" onclick="sludgeSub=\'docs\';renderSludge()">转运三联单</button>'
-    +'<button class="subtab'+(sludgeSub==='calc'?' active':'')+'" onclick="sludgeSub=\'calc\';renderSludge()">板框产泥计算</button>'
+    +'<button class="subtab'+(sludgeSub==='calc'?' active':'')+'" onclick="sludgeCalcYm=sludgePeriod.ym;sludgeSub=\'calc\';renderSludge()">板框产泥计算</button>'
     +'</div>';
   h+='<div class="sludge-bar">'
-    +'<div class="stat-card"><div class="v">'+fmt(sk.prod)+' T</div><div class="k">本月板框产泥量</div></div>'
-    +'<div class="stat-card"><div class="v">'+fmt(sk.tran)+' T</div><div class="k">本月转运污泥量</div></div>'
-    +'<div class="stat-card"><div class="v">'+fmt(sk.open)+' T</div><div class="k">本月初始库存</div></div>'
-    +'<div class="stat-card"><div class="v'+(sk.left<0?' red':'')+'">'+fmt(sk.left)+' T</div><div class="k">本月剩余量</div></div>'
+    +'<div class="stat-card"><div class="v">'+fmt(sk.prod)+' T</div><div class="k">'+labelPrefix+'板框产泥量</div></div>'
+    +'<div class="stat-card"><div class="v">'+fmt(sk.tran)+' T</div><div class="k">'+labelPrefix+'转运污泥量</div></div>'
+    +'<div class="stat-card"><div class="v">'+fmt(sk.open)+' T</div><div class="k">'+labelPrefix+'初始库存</div></div>'
+    +'<div class="stat-card"><div class="v'+(sk.left<0?' red':'')+'">'+fmt(sk.left)+' T</div><div class="k">'+labelPrefix+'剩余量</div></div>'
     +'</div>';
   h+='<div class="row" style="margin-bottom:14px"><span class="muted">2026年初初始库存基数(T)（仅最早月份用）：</span><input type="number" id="sludgeBase" style="width:120px" value="'+num(DB.settings.sludgeBase)+'" onchange="DB.settings.sludgeBase=num(this.value);save();renderSludge()"><button class="btn ghost sm" onclick="sludgeCalcAvg()">平均反推每日板框产泥量</button></div>';
   if(sludgeSub==='prod'){
