@@ -584,14 +584,14 @@ var IMPORT2026={"water": [{"date": "2026-01-01", "inflow": 13106.0, "outflow": 1
 /* ================= 数据层 ================= */
 var KEY='wb_qsww_db';
 var DB=null;
-function blank(){return {reports:[],ledgers:{water:[],production:[],chemical:[],chemStock:[],electric:[],sludge:[],transfer:[],reduction:[],dispatch:[],abnormal:[],overflow:[],invoice:[],lab:[],docentry:[]},files:[],monitor:{},settings:{sludgeBase:0,sludgeOpen:{}},sample:false,imported2026:false};}
+function blank(){return {reports:[],ledgers:{water:[],production:[],chemical:[],chemStock:[],electric:[],sludge:[],transfer:[],reduction:[],dispatch:[],abnormal:[],overflow:[],invoice:[],lab:[],docentry:[]},files:[],monitor:{},settings:{sludgeBase:0},sample:false,imported2026:false};}
 function migrate(){
   var b=blank();
   for(var k in b.ledgers)if(!DB.ledgers[k])DB.ledgers[k]=[];
   for(var k in LEDGERS)if(!LEDGERS[k].hidden&&!LEDGERS[k].computed&&!DB.ledgers[k])DB.ledgers[k]=[];
   if(!DB.monitor)DB.monitor={};
-  if(!DB.settings)DB.settings={sludgeBase:0,sludgeOpen:{}};
-  if(!DB.settings.sludgeOpen)DB.settings.sludgeOpen={};
+  if(!DB.settings)DB.settings={sludgeBase:0};
+  if(DB.settings.sludgeOpen){delete DB.settings.sludgeOpen;}  /* 期初改为严格按上月末剩余自动算，不再使用手动登记 */
   if(DB.files==null)DB.files=[];
   if(DB.reports==null)DB.reports=[];
 }
@@ -670,13 +670,11 @@ function sumRows(rows,key){var s=0;rows.forEach(function(r){s+=num(r[key]);});re
 function monthRows(cat,ym,dk){return DB.ledgers[cat].filter(function(r){return (r[dk||'date']||'').slice(0,7)===ym;});}
 function sludgeProdVal(r){return (r.plate!=null&&r.plate!=='')?num(r.plate):num(r.cake);}
 function sludgeOpenOf(ym){
-  /* 某月月初初始库存（=上月末剩余）。优先用按月登记 sludgeOpen[ym]，否则按全局年初基数+此前各月(产生-转运)回退 */
-  var so=DB.settings.sludgeOpen||{};
-  if(so[ym]!=null&&so[ym]!=='')return num(so[ym]);
+  /* 某月月初初始库存 = 严格按「上月末剩余」滚动：全局年初基数 + 该月之前所有月份(产生-转运)。不再读取手动登记，避免覆盖自动滚动 */
   var base=num(DB.settings.sludgeBase),pb=0,tb=0;
   DB.ledgers.sludge.forEach(function(r){if(r.date.slice(0,7)<ym)pb+=sludgeProdVal(r);});
   DB.ledgers.transfer.forEach(function(r){if(r.date.slice(0,7)<ym)tb+=num(r.net);});
-  return base+pb-tb;
+  return Math.round((base+pb-tb)*1000)/1000;
 }
 function sludgeStock(ym){
   /* 返回 {open:本月初始库存, prod:本月产生, tran:本月转运, left:本月剩余}，单位 T */
@@ -1700,7 +1698,7 @@ function renderSludgeCalc(){
   h+='<div class="row" style="margin-bottom:12px"><div class="fld" style="width:200px"><label>统计月份</label><input type="month" value="'+ym+'" onchange="sludgeCalcYm=this.value;sludgeCalcEnd[sludgeCalcYm]=null;renderSludge()"></div>'
     +'<button class="btn ghost" onclick="sludgeSub=\'prod\';renderSludge()">去产泥记录查看</button></div>';
   h+='<div class="grid3" style="margin-bottom:10px">'
-    +'<div class="fld"><label>本月初始库存(T)（期初=上月末剩余，按月登记）</label><input type="number" id="scOpen" value="'+open+'" onchange="DB.settings.sludgeOpen=DB.settings.sludgeOpen||{};DB.settings.sludgeOpen[\''+ym+'\']=num(this.value);save();renderSludge()"></div>'
+    +'<div class="fld"><label>本月初始库存(T)（自动=上月末剩余，不可改）</label><input type="number" value="'+open+'" readonly style="background:var(--blue-xl)"></div>'
     +'<div class="fld"><label>本月转运量(T)（自动合计）</label><input type="number" value="'+tran+'" readonly style="background:var(--blue-xl)"></div>'
     +'<div class="fld"><label>本月剩余量(T)（期末，请填实际过磅）</label><input type="number" id="scEnd" value="'+end+'" onchange="sludgeCalcEnd[\''+ym+'\']=num(this.value);renderSludge()"></div>'
     +'</div>';
