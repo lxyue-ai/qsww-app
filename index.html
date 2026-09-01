@@ -2727,14 +2727,29 @@ function impDateTime(v){
 function mergeImport(cat,recs){
   var arr=DB.ledgers[cat]||(DB.ledgers[cat]=[]);
   var keyF=IMPORT_MAP[cat].date?'date':'month';
-  var exist={};arr.forEach(function(r){if(r&&r[keyF])exist[r[keyF]]=r;});
-  var added=0,updated=0;
+  var dbExist={};arr.forEach(function(r){if(r&&r[keyF])dbExist[r[keyF]]=r;});
+  var batchAdded={};   /* 本次导入已新增的日期，用于识别「同批重复日期」 */
+  var added=0,ignored=0;
   recs.forEach(function(rec){
-    var k=rec[keyF],ex=exist[k];
-    if(ex){for(var f in rec){if(rec[f]!=null&&rec[f]!=='')ex[f]=rec[f];}updated++;}
-    else{rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);arr.push(rec);exist[k]=rec;added++;}
+    var k=rec[keyF];
+    /* 同一批导入内出现重复日期（如一天多车转运）：不覆盖、不忽略，作为独立记录新增，保证转运量被正确累加 */
+    if(batchAdded[k]){
+      rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);
+      arr.push(rec); added++; return;
+    }
+    var ex=dbExist[k];
+    if(ex){
+      /* 与已有记录同日：只有「所有字段值完全相同」才视为重复导入并跳过；否则新增独立记录，避免覆盖导致数据丢失 */
+      var same=true;
+      for(var f in rec){ if(rec[f]!=null&&rec[f]!==''){ if(ex[f]!==rec[f]){same=false;break;} } }
+      if(same){ignored++; return;}
+      rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);
+      arr.push(rec); added++; batchAdded[k]=true; return;
+    }
+    rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);
+    arr.push(rec); added++; batchAdded[k]=true;
   });
-  return {added:added,updated:updated};
+  return {added:added,updated:0,ignored:ignored};
 }
 function openImport(cat){
   impState={cat:cat};
@@ -2742,7 +2757,7 @@ function openImport(cat){
   var opts='';LEDGERS[cat].fields.forEach(function(f){opts+='<option value="'+f.k+'">'+f.l+'</option>';});
   var box='<div class="imp-modal" id="impModal"><div class="imp-box">'
     +'<h3>导入表格 → '+nf+'</h3>'
-    +'<div class="sub">选择 Excel(.xlsx/.xls) 或 CSV 文件，工作台会自动识别列并预览，确认后追加到「'+nf+'」。重复日期/月份会自动更新，不会重复新增。</div>'
+    +'<div class="sub">选择 Excel(.xlsx/.xls) 或 CSV 文件，工作台会自动识别列并预览，确认后追加到「'+nf+'」。同一日期出现多行（如一天多车转运）会分别保留为独立记录并正确累加，不再自动忽略或覆盖；仅当某行与已有记录完全相同才跳过。</div>'
     +'<div class="imp-sec"><input type="file" id="impFile" accept=".xlsx,.xls,.csv"></div>'
     +'<div class="imp-err" id="impErr"></div>'
     +'<div id="impBody"></div>'
@@ -2850,7 +2865,7 @@ function confirmImport(){
   var res=mergeImport(impState.cat,recs);
   save();closeImport();
   if(impState.cat==='transfer'||impState.cat==='sludge')renderSludge();else renderLedger();
-  toast('导入完成：新增 '+res.added+' 条，更新 '+res.updated+' 条');
+  toast('导入完成：新增 '+res.added+' 条'+(res.ignored?('，跳过 '+res.ignored+' 条完全重复'):'')+'（重复日期已分别保留并累加）');
 }
 
 /* ================= 初始化 ================= */
