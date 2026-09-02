@@ -2899,6 +2899,18 @@ function impDateTime(v){
 function mergeImport(cat,recs){
   var arr=DB.ledgers[cat]||(DB.ledgers[cat]=[]);
   var keyF=IMPORT_MAP[cat].date?'date':'month';
+  /* 水量台账：日期唯一，导入应「按日期覆盖」（已有同日更新字段、新增缺失日），不产生重复日期，确保与权威 WPS 表一致 */
+  if(cat==='water'){
+    var dbE={};arr.forEach(function(r){if(r&&r.date)dbE[r.date]=r;});
+    var added=0,updated=0;
+    recs.forEach(function(rec){
+      if(!rec.date)return;
+      var ex=dbE[rec.date];
+      if(ex){for(var f in rec){if(rec[f]!=null&&rec[f]!=='')ex[f]=rec[f];}updated++;}
+      else{rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);arr.push(rec);dbE[rec.date]=rec;added++;}
+    });
+    return {added:added,updated:updated,ignored:0};
+  }
   var dbExist={};arr.forEach(function(r){if(r&&r[keyF])dbExist[r[keyF]]=r;});
   var batchAdded={};   /* 本次导入已新增的日期，用于识别「同批重复日期」 */
   var added=0,ignored=0;
@@ -2943,7 +2955,7 @@ function openImport(cat){
   var opts='';LEDGERS[cat].fields.forEach(function(f){opts+='<option value="'+f.k+'">'+f.l+'</option>';});
   var box='<div class="imp-modal" id="impModal"><div class="imp-box">'
     +'<h3>导入表格 → '+nf+'</h3>'
-    +'<div class="sub">选择 Excel(.xlsx/.xls) 或 CSV 文件，工作台会自动识别列并预览，确认后追加到「'+nf+'」。同一日期出现多行（如一天多车转运）会分别保留为独立记录并正确累加，不再自动忽略或覆盖；仅当某行与已有记录完全相同才跳过。</div>'
+    +'<div class="sub">选择 Excel(.xlsx/.xls) 或 CSV 文件，工作台会自动识别列并预览。水量台账按「日期」覆盖更新已有记录、其余追加；其他台账同日多行会分别保留并累加；仅完全相同的重复行才跳过。</div>'
     +'<div class="imp-sec"><input type="file" id="impFile" accept=".xlsx,.xls,.csv"></div>'
     +'<div class="imp-err" id="impErr"></div>'
     +'<div id="impBody"></div>'
@@ -3051,7 +3063,7 @@ function confirmImport(){
   var res=mergeImport(impState.cat,recs);
   save();closeImport();
   if(impState.cat==='transfer'||impState.cat==='sludge')renderSludge();else renderLedger();
-  toast('导入完成：新增 '+res.added+' 条'+(res.ignored?('，跳过 '+res.ignored+' 条完全重复'):'')+'（重复日期已分别保留并累加）');
+  toast('导入完成：新增 '+res.added+' 条'+(res.updated?('，按日期覆盖更新 '+res.updated+' 条'):'')+(res.ignored?('，跳过 '+res.ignored+' 条完全重复'):'')+(res.added&&!res.updated&&cat!=='water'?'（重复日期已分别保留并累加）':''));
 }
 
 /* ================= 初始化 ================= */
