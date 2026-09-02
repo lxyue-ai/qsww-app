@@ -1317,7 +1317,7 @@ var LEDGERS={
  chlorine:{name:'加氯量表',fields:[]},
  lab:{name:'化验记录表',fields:[{k:'date',l:'日期',t:'date'},{k:'sample',l:'水样',t:'sel',opts:['进水','出水','1#','2#','3#','4#','5#']},{k:'time',l:'取样时间',t:'text'},{k:'cod',l:'COD(mg/L)'},{k:'nh3',l:'NH3-N(mg/L)'},{k:'tp',l:'TP(mg/L)'},{k:'tn',l:'TN(mg/L)'},{k:'ss',l:'SS(mg/L)'},{k:'bod',l:'BOD(mg/L)'},{k:'sv30',l:'SV30(%)'},{k:'mlssL',l:'MLSS液位'},{k:'mlss',l:'MLSS化验数据'},{k:'water',l:'污泥含水率(%)'}]},
  docentry:{name:'发文登记',attach:'归档',fields:[{k:'date',l:'日期',t:'date'},{k:'toOrg',l:'主送机关',t:'text'},{k:'ccOrg',l:'抄送机关',t:'text'},{k:'docNo',l:'发文字号',t:'text'},{k:'summary',l:'摘由',t:'text'}]},
- reductionSum:{name:'减排情况汇总表',fields:[{k:'month',l:'月份',t:'month'},{k:'inWater',l:'累计进水量(万m3)'},{k:'outWater',l:'累计出水量(万m3)'},{k:'sludge',l:'污泥转运量(吨)'},{k:'power',l:'用电量(千瓦时)'},{k:'floc',l:'絮凝剂用量(kg)'},{k:'codIn',l:'进口COD(mg/l)'},{k:'bodIn',l:'进口BOD5(mg/l)'},{k:'ssIn',l:'进口SS(mg/l)'},{k:'nh3In',l:'进口氨氮(mg/l)'},{k:'tnIn',l:'进口总氮(mg/l)'},{k:'tpIn',l:'进口总磷(mg/l)'},{k:'codOut',l:'出口COD(mg/l)'},{k:'bodOut',l:'出口BOD5(mg/l)'},{k:'ssOut',l:'出口SS(mg/l)'},{k:'nh3Out',l:'出口氨氮(mg/l)'},{k:'tnOut',l:'出口总氮(mg/l)'},{k:'tpOut',l:'出口总磷(mg/l)'},{k:'note',l:'备注',t:'text'}]}
+ reductionSum:{name:'减排情况汇总表',fields:[{k:'month',l:'月份',t:'month'},{k:'inWater',l:'累计进水量(m3)'},{k:'outWater',l:'累计出水量(m3)'},{k:'sludge',l:'污泥转运量(吨)'},{k:'power',l:'用电量(千瓦时)'},{k:'floc',l:'絮凝剂用量(kg)'},{k:'codIn',l:'进口COD(mg/l)'},{k:'bodIn',l:'进口BOD5(mg/l)'},{k:'ssIn',l:'进口SS(mg/l)'},{k:'nh3In',l:'进口氨氮(mg/l)'},{k:'tnIn',l:'进口总氮(mg/l)'},{k:'tpIn',l:'进口总磷(mg/l)'},{k:'codOut',l:'出口COD(mg/l)'},{k:'bodOut',l:'出口BOD5(mg/l)'},{k:'ssOut',l:'出口SS(mg/l)'},{k:'nh3Out',l:'出口氨氮(mg/l)'},{k:'tnOut',l:'出口总氮(mg/l)'},{k:'tpOut',l:'出口总磷(mg/l)'},{k:'note',l:'备注',t:'text'}]}
 };
 var LEDGER_TABS=['water','dailyavg','chlorine','production','dispatch','reduction','reductionSum','lab','electric','chemical','invoice','docentry'];
 var curEdit={cat:null,id:null};
@@ -2312,7 +2312,7 @@ function schedData(ym){
   return {
     ym:ym,y:y,m:m,daysInMonth:daysInMonth,
     sumIn:sumIn,sumOut:sumOut,inDays:inDays,outDays:outDays,
-    inWan:Math.round(sumIn/10000*100)/100,outWan:Math.round(sumOut/10000*100)/100,
+    inWan:Math.round(sumIn),outWan:Math.round(sumOut),
     power:power,powerWan:Math.round(power/10000*100)/100,pam:pam,cake:cake,tran:tran,
     chlorine:Math.round(chlorine*100)/100,abnormalMarks:abnormalMarks,
     dayProc:inDays?Math.round(sumIn/inDays*100)/100:'',
@@ -2401,7 +2401,7 @@ function redRepData(ym){
   avgIn['SS']=labSum.ss.cIn?Math.round(labSum.ss.in/labSum.ss.cIn*100)/100:null;
   avgOut['SS']=labSum.ss.cOut?Math.round(labSum.ss.out/labSum.ss.cOut*100)/100:null;
   return {sumIn:sumIn,sumOut:sumOut,power:power,cake:Math.round(cake*10)/10,pam:pam,pr:pr,avgIn:avgIn,avgOut:avgOut,
-    inWan:Math.round(sumIn/10000*100)/100,outWan:Math.round(sumOut/10000*100)/100,
+    inWan:Math.round(sumIn),outWan:Math.round(sumOut),
     cost:sumIn?Math.round(power/sumIn*100)/100:0};
 }
 function renderRedRep(ym){
@@ -2410,7 +2410,7 @@ function renderRedRep(ym){
   var h='<h2 style="margin-bottom:10px">清水县污水处理厂'+ym.slice(0,4)+'年'+m+'月份减排情况月汇总表</h2>';
   h+='<div class="section-note">按《减排台账》模板第一部分自动生成：产生量/排放量 = 监测日均值 × 当日水量累计（吨）；污泥处理量、用电量取自生产量统计；絮凝剂用量取 PAM 合计。BOD5、SS 取化验记录表月均值。</div>';
   h+='<div class="tbwrap"><table class="tb"><thead><tr><th>项　目</th><th>数　据</th></tr></thead><tbody>';
-  h+=rr('累计进水量（万m3）',d.inWan)+rr('累计出水量（万m3）',d.outWan)+rr('含固率60%的污泥处理量（吨）',d.cake);
+  h+=rr('累计进水量（m3）',d.inWan)+rr('累计出水量（m3）',d.outWan)+rr('含固率60%的污泥处理量（吨）',d.cake);
   d.pr.forEach(function(p){
     h+=rr('进口'+p.name+'产生量（吨）',p.gen);
     h+=rr('出口'+p.name+'排放量（吨）',p.emi,'red');
@@ -2436,7 +2436,7 @@ function exportRedDoc(ym){
     +'<p>单位盖章：清水县城区生活污水处理厂</p><p>填报日期：'+cnDate(todayStr())+'</p>'
     +'<h2>第一部分　每月减排汇总表</h2><h3>清水县污水处理厂'+ym.slice(0,4)+'年'+m+'月份减排情况月汇总表</h3>'
     +'<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;font-size:13px"><tr><th>项　目</th><th>数　据</th></tr>'
-    +'<tr><td>累计进水量（万m3）</td><td>'+d.inWan+'</td></tr><tr><td>累计出水量（万m3）</td><td>'+d.outWan+'</td></tr>'
+    +'<tr><td>累计进水量（m3）</td><td>'+d.inWan+'</td></tr><tr><td>累计出水量（m3）</td><td>'+d.outWan+'</td></tr>'
     +'<tr><td>含固率60%的污泥处理量（吨）</td><td>'+d.cake+'</td></tr>';
   d.pr.forEach(function(p){
     body+='<tr><td>进口'+p.name+'产生量（吨）</td><td>'+p.gen+'</td></tr>';
@@ -2469,21 +2469,30 @@ function redAutoFill(ym){
     for(var ds in DB.monitor){if(ds.slice(0,7)!==ym)continue;var m=DB.monitor[ds];if(m[p[1]]!=null){s+=num(m[p[1]]);c++;}}
     avg[p[0]]=c?Math.round(s/c*100)/100:null;
   });
-  return {inWater:sumIn?Math.round(sumIn/10000*100)/100:null,outWater:sumOut?Math.round(sumOut/10000*100)/100:null,
+  return {inWater:sumIn?Math.round(sumIn):null,outWater:sumOut?Math.round(sumOut):null,
     power:power||null,sludge:sludge?Math.round(sludge*100)/100:null,codIn:avg.codIn,nh3In:avg.nh3In,tnIn:avg.tnIn,tpIn:avg.tpIn};
 }
 function redSumCalc(r){
   function t(v){return (v==null||v===''||isNaN(v))?null:Number(v);}
   var iw=t(r.inWater),ow=t(r.outWater),pw=t(r.power);
+  /* 单位迁移兜底：旧数据以万m3存储（数值<5000），按 m3 换算，保证公式正确 */
+  if(iw!=null&&iw<5000)iw=iw*10000;
+  if(ow!=null&&ow<5000)ow=ow*10000;
   function gen(ci,co){var cin=t(ci),cout=t(co);if(iw==null||cin==null)return {gen:null,emi:null,red:null};
-    var g=Math.round(iw*cin/100*1000)/1000,e=(ow!=null&&cout!=null)?Math.round(ow*cout/100*1000)/1000:null;
+    var g=Math.round(iw*cin/1000000*1000)/1000,e=(ow!=null&&cout!=null)?Math.round(ow*cout/1000000*1000)/1000:null;
     return {gen:g,emi:e,red:(e!=null?Math.round((g-e)*1000)/1000:null)};}
   var cod=gen(r.codIn,r.codOut),nh3=gen(r.nh3In,r.nh3Out),tn=gen(r.tnIn,r.tnOut),tp=gen(r.tpIn,r.tpOut);
-  var cost=(iw&&pw!=null)?Math.round(pw/(iw*10000)*10000)/10000:null;
+  var cost=(iw&&pw!=null)?Math.round(pw/iw*10000)/10000:null;
   return {cod:cod,nh3:nh3,tn:tn,tp:tp,cost:cost};
 }
 function redSumFields(){return ['inWater','outWater','sludge','power','floc','codIn','bodIn','ssIn','nh3In','tnIn','tpIn','codOut','bodOut','ssOut','nh3Out','tnOut','tpOut','note'];}
 function renderRedSum(){
+  /* 单位迁移：旧记录以「万m3」存储（数值<5000），打开时自动换算为「m3」与数量表一致并保存 */
+  var mig=false;(DB.ledgers.reductionSum||[]).forEach(function(r){
+    if(r.inWater!=null&&!isNaN(r.inWater)&&Number(r.inWater)<5000){r.inWater=Math.round(Number(r.inWater)*10000);mig=true;}
+    if(r.outWater!=null&&!isNaN(r.outWater)&&Number(r.outWater)<5000){r.outWater=Math.round(Number(r.outWater)*10000);mig=true;}
+  });
+  if(mig)save();
   var all=(DB.ledgers.reductionSum||[]).slice();
   var q=(redSumQ||'').trim().toLowerCase();
   var rows=all.filter(function(r){if(!q)return true;return ((r.month||'')+' '+(r.note||'')).toLowerCase().indexOf(q)>=0;})
@@ -2506,7 +2515,7 @@ function renderRedSum(){
   h+='<button class="btn ghost" onclick="redSumAutoFill()">⚡ 自动获取工作台数据</button>';
   h+='<span class="muted" style="align-self:center">（顶部「导入表格」按钮可批量导入 Excel）</span></div>';
   h+='<div class="muted" style="margin-bottom:8px">说明：下表「进口产生量 / 出口排放量 / 减排量 / 电耗」为自动计算（标红），无需填写；其余为录入或自动获取值。BOD5、SS 与出口各项请手动填写。</div>';
-  h+='<div class="tbwrap"><table class="tb"><thead><tr><th>月份</th><th>进水量(万m3)</th><th>出水量(万m3)</th><th>污泥(吨)</th><th>用电量</th><th>絮凝剂</th>'
+  h+='<div class="tbwrap"><table class="tb"><thead><tr><th>月份</th><th>进水量(m3)</th><th>出水量(m3)</th><th>污泥(吨)</th><th>用电量</th><th>絮凝剂</th>'
     +'<th>进口COD<br>产生量(吨)</th><th>出口COD<br>排放量(吨)</th><th>COD<br>减排量(吨)</th>'
     +'<th>进口氨氮<br>产生量</th><th>出口氨氮<br>排放量</th><th>氨氮<br>减排量</th>'
     +'<th>进口总氮<br>产生量</th><th>出口总氮<br>排放量</th><th>总氮<br>减排量</th>'
@@ -2558,8 +2567,8 @@ function redSumParseSheet(rows,ym){
     var a=impNorm(r[0]||''),b=impToNum(r[1]),c=impToNum(r[2]);
     if(a==='')return;
     if(a.indexOf('产生量')>=0||a.indexOf('排放量')>=0||a.indexOf('减排量')>=0||a.indexOf('电耗')>=0)return; /* 计算列不导入，重算 */
-    if(a.indexOf('进水量')>=0&&a.indexOf('出水')<0)rec.inWater=b;
-    else if(a.indexOf('出水量')>=0)rec.outWater=b;
+    if(a.indexOf('进水量')>=0&&a.indexOf('出水')<0)rec.inWater=Math.round(b*10000);
+    else if(a.indexOf('出水量')>=0)rec.outWater=Math.round(b*10000);
     else if(a.indexOf('污泥')>=0)rec.sludge=b;
     else if(a.indexOf('用电量')>=0)rec.power=b;
     else if(a.indexOf('絮凝剂')>=0)rec.floc=b;
@@ -2579,7 +2588,7 @@ function redSumImport(){
   impState.preview=allRecs;impState.recs=allRecs;impState.ym='auto';
   var html='<div class="section-note">已按「每月一张表」纵向结构解析：A列项目→C列数据；水质指标区 A列指标、B列进口、C列出口。每月生成一条记录，重复月份将覆盖更新。</div>';
   if(multi)html+='<div class="muted">共 '+sheets.length+' 个工作表 → '+allRecs.length+' 条月度记录。</div>';
-  html+='<div class="imp-prev"><table><thead><tr><th>月份</th><th>进水量(万m3)</th><th>出水量(万m3)</th><th>污泥(吨)</th><th>用电量</th><th>絮凝剂</th><th>进口COD</th><th>出口COD</th><th>进口氨氮</th><th>出口氨氮</th><th>进口总氮</th><th>出口总氮</th><th>进口总磷</th><th>出口总磷</th></tr></thead><tbody>';
+  html+='<div class="imp-prev"><table><thead><tr><th>月份</th><th>进水量(m3)</th><th>出水量(m3)</th><th>污泥(吨)</th><th>用电量</th><th>絮凝剂</th><th>进口COD</th><th>出口COD</th><th>进口氨氮</th><th>出口氨氮</th><th>进口总氮</th><th>出口总氮</th><th>进口总磷</th><th>出口总磷</th></tr></thead><tbody>';
   allRecs.forEach(function(r){
     html+='<tr><td>'+(r.month||'')+'</td>'
       +'<td>'+(r.inWater!=null?r.inWater:'')+'</td><td>'+(r.outWater!=null?r.outWater:'')+'</td>'
@@ -2600,8 +2609,8 @@ function exportRedSumDoc(id){
     +'<p>填报日期：'+cnDate(todayStr())+'</p>'
     +'<h3>清水县污水处理厂'+ym.slice(0,4)+'年'+m+'月份减排情况月汇总表</h3>'
     +'<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;font-size:13px"><tr><th>项　目</th><th>数　据</th></tr>'
-    +'<tr><td>累计进水量（万m3）</td><td>'+(r.inWater!=null?r.inWater:'')+'</td></tr>'
-    +'<tr><td>累计出水量（万m3）</td><td>'+(r.outWater!=null?r.outWater:'')+'</td></tr>'
+    +'<tr><td>累计进水量（m3）</td><td>'+(r.inWater!=null?r.inWater:'')+'</td></tr>'
+    +'<tr><td>累计出水量（m3）</td><td>'+(r.outWater!=null?r.outWater:'')+'</td></tr>'
     +'<tr><td>污泥转运量（吨）</td><td>'+(r.sludge!=null?r.sludge:'')+'</td></tr>'
     +'<tr><td>进口COD产生量（吨）</td><td>'+(c.cod.gen!=null?c.cod.gen:'')+'</td></tr>'
     +'<tr style="color:#c00"><td>出口COD排放量（吨）</td><td>'+(c.cod.emi!=null?c.cod.emi:'')+'</td></tr>'
