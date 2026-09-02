@@ -485,6 +485,7 @@ table.tb tbody tr:hover{background:var(--blue-xl)}
             <option value="sched">运行调度月报（自动生成）</option>
             <option value="redRep">减排台账月报（自动生成）</option>
             <option value="selfCheck">厂内自检报告</option>
+            <option value="monitor">在线监测日均值表</option>
           </select></div>
           <div class="fld"><label>统计周期</label><select id="s_period" onchange="renderStats()">
             <option value="month">月度</option><option value="quarter">季度</option><option value="year">年度</option>
@@ -1017,6 +1018,8 @@ function monParseExcel(XLSX,buf){
 }
 function monAvg(a){if(!a.length)return null;var s=0;a.forEach(function(v){s+=v;});return Math.round(s/a.length*100)/100;}
 function monSum1(a){var s=0;a.forEach(function(v){s+=v;});return Math.round(s*10)/10;}
+function monMax(a){return a&&a.length?Math.max.apply(null,a):null;}
+function monMin(a){return a&&a.length?Math.min.apply(null,a):null;}
 function monExStat(vals){
   if(!vals.length)return null;
   var mn=Math.min.apply(null,vals);
@@ -1038,13 +1041,13 @@ function monCompute(){
       if(!rin.hours||!rout.hours){msg.textContent='表格里没有识别到逐时数据行';return;}
       var date=rout.date||rin.date;
       if(!date){msg.textContent='未能识别数据日期';return;}
-      var codS=monExStat(rout.cod),nh3S=monExStat(rout.nh3),tnS=monExStat(rout.tn),tpS=monExStat(rout.tp);
+      var codAvg=monAvg(rout.cod),nh3Avg=monAvg(rout.nh3),tnAvg=monAvg(rout.tn),tpAvg=monAvg(rout.tp);
       var rec={inQ:monSum1(rin.flow),outQ:monSum1(rout.flow),
         inCod:monAvg(rin.cod),inNh3:monAvg(rin.nh3),inTn:monAvg(rin.tn),inTp:monAvg(rin.tp),
-        cod:codS?codS.avg:null,codMax:codS?codS.max:null,codMin:codS?codS.min:null,
-        nh3:nh3S?nh3S.avg:null,nh3Max:nh3S?nh3S.max:null,nh3Min:nh3S?nh3S.min:null,
-        tn:tnS?tnS.avg:null,tnMax:tnS?tnS.max:null,tnMin:tnS?tnS.min:null,
-        tp:tpS?tpS.avg:null,tpMax:tpS?tpS.max:null,tpMin:tpS?tpS.min:null,
+        cod:codAvg,codMax:monMax(rout.cod),codMin:monMin(rout.cod),
+        nh3:nh3Avg,nh3Max:monMax(rout.nh3),nh3Min:monMin(rout.nh3),
+        tn:tnAvg,tnMax:monMax(rout.tn),tnMin:monMin(rout.tn),
+        tp:tpAvg,tpMax:monMax(rout.tp),tpMin:monMin(rout.tp),
         ph:monAvg(rout.ph)};
       DB.monitor[date]=rec;
       syncWater(date,rec.inQ,rec.outQ);
@@ -1413,7 +1416,8 @@ function renderElectricChart(data,title,color){
   el.innerHTML=svg;
 }
 /* ================= 在线监测数据日均值统计表（从 DB.monitor 自动取数） ================= */
-function renderDailyAvg(){
+function renderDailyAvg(target){
+  target=target||'ledgerBody';
   var ym=dailyAvgMonth||thisMonth();
   var y=+ym.slice(0,4),m=+ym.slice(5,7);
   var daysInMonth=new Date(y,m,0).getDate();
@@ -1423,17 +1427,22 @@ function renderDailyAvg(){
   for(var d=1;d<=daysInMonth;d++){
     var ds=ym+'-'+String(d).padStart(2,'0');
     var rec=DB.monitor[ds]||{};
-    var row={d:d,ds:ds};
-    keys.forEach(function(k){
-      var v=rec[k];
-      if(v!=null&&!isNaN(v)){row[k]=Number(v);vals[k].push(Number(v));}else{row[k]=null;}
+    var row={d:d};
+    /* 流量：每日小时流量均值 = 日总流量(累计求和) ÷ 24 */
+    row.inQ =(rec.inQ!=null&&!isNaN(rec.inQ))?Math.round(rec.inQ/24*100)/100:null;
+    row.outQ=(rec.outQ!=null&&!isNaN(rec.outQ))?Math.round(rec.outQ/24*100)/100:null;
+    ['inCod','inNh3','inTn','inTp','cod','nh3','tn','tp'].forEach(function(k){
+      var v=rec[k];row[k]=(v!=null&&!isNaN(v))?Number(v):null;
     });
+    keys.forEach(function(k){if(row[k]!=null)vals[k].push(row[k]);});
     rows.push(row);
   }
   function st(a){if(!a.length)return null;var s=0,mx=a[0],mn=a[0];a.forEach(function(v){s+=v;mx=Math.max(mx,v);mn=Math.min(mn,v);});return {max:mx,min:mn,avg:Math.round(s/a.length*100)/100};}
   var stats={};keys.forEach(function(k){stats[k]=st(vals[k]);});
-  var h='<div class="section-note">自动从每日上传的「进水口 + 排污口」监测表格中提取日均值。进口为各指标日均值；出口 COD/氨氮/总氮/总磷按环保部门口径：日均值 = 去除当日最大值后的平均值。底部自动计算月最大、最小、平均值。</div>';
-  h+='<div class="row" style="margin-bottom:12px"><div class="fld" style="width:180px"><label>月份</label><input type="month" id="da_month" value="'+ym+'" onchange="dailyAvgMonth=this.value;renderDailyAvg()"></div><button class="btn ghost" onclick="exportDailyAvgCSV()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button></div>';
+  /* 出口 COD/氨氮/总氮/总磷 超过一级A 标准自动标红：COD>50、氨氮>5、总氮>15、总磷>0.5 mg/l */
+  function overRed(k,v){if(v==null||isNaN(v))return '';var lim={'cod':50,'nh3':5,'tn':15,'tp':0.5}[k];return (lim!=null&&v>lim)?' class="over-red"':'';}
+  var h='<div class="section-note">自动从每日上传的「进水口 + 排污口」监测表格中提取小时流量与全量小时数据日均值。流量列 = 日总流量(累计求和) ÷ 24（每日小时流量均值）；进口/出口 COD、氨氮、总氮、总磷为当日所有有效小时数据的平均值（不做去最大值处理）。出口指标超过一级A标准（COD&gt;50、氨氮&gt;5、总氮&gt;15、总磷&gt;0.5 mg/l）自动标红。底部自动计算月最大、最小、平均值。</div>';
+  h+='<div class="row" style="margin-bottom:12px"><div class="fld" style="width:180px"><label>月份</label><input type="month" id="da_month" value="'+ym+'" onchange="dailyAvgMonth=this.value;renderDailyAvg(\''+target+'\')"></div><button class="btn ghost" onclick="exportDailyAvgCSV()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button></div>';
   h+='<h2 style="margin-bottom:6px;text-align:center">清水县污水处理厂 '+y+'年'+m+'月份在线监测数据日均值统计表</h2>';
   h+='<div class="tbwrap"><table class="tb water-rpt"><thead>';
   h+='<tr><th rowspan="2">时间</th><th colspan="5">进口</th><th colspan="5">出口</th></tr>';
@@ -1441,17 +1450,17 @@ function renderDailyAvg(){
   h+='</thead><tbody>';
   rows.forEach(function(r){
     h+='<tr><td>'+r.d+'日</td>';
-    keys.forEach(function(k){h+='<td>'+fe(r[k])+'</td>';});
+    keys.forEach(function(k){h+='<td'+overRed(k,r[k])+'>'+fe(r[k])+'</td>';});
     h+='</tr>';
   });
   ['最大值','最小值','平均值'].forEach(function(label,idx){
     var type=['max','min','avg'][idx];
     h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>'+label+'</td>';
-    keys.forEach(function(k){var s=stats[k];h+='<td>'+(s?fe(s[type]):'-')+'</td>';});
+    keys.forEach(function(k){var s=stats[k];h+='<td'+overRed(k,s?Number(s[type]):null)+'>'+(s?fe(s[type]):'-')+'</td>';});
     h+='</tr>';
   });
   h+='</tbody></table></div>';
-  document.getElementById('ledgerBody').innerHTML=h;
+  document.getElementById(target).innerHTML=h;
 }
 function exportDailyAvgCSV(){
   var ym=dailyAvgMonth||thisMonth();
@@ -1463,9 +1472,17 @@ function exportDailyAvgCSV(){
   for(var d=1;d<=daysInMonth;d++){
     var ds=ym+'-'+String(d).padStart(2,'0');
     var rec=DB.monitor[ds]||{};
+    var inQ=(rec.inQ!=null&&!isNaN(rec.inQ))?Math.round(rec.inQ/24*100)/100:null;
+    var outQ=(rec.outQ!=null&&!isNaN(rec.outQ))?Math.round(rec.outQ/24*100)/100:null;
     csv+=d+'日';
-    keys.forEach(function(k){var v=rec[k];if(v!=null&&!isNaN(v)){csv+=','+fmt(Number(v));vals[k].push(Number(v));}else{csv+=',';}});
+    csv+=','+(inQ!=null?fmt(inQ):'');
+    ['inCod','inNh3','inTn','inTp'].forEach(function(k){var v=rec[k];csv+=','+(v!=null&&!isNaN(v)?fmt(Number(v)):'');});
+    csv+=','+(outQ!=null?fmt(outQ):'');
+    ['cod','nh3','tn','tp'].forEach(function(k){var v=rec[k];csv+=','+(v!=null&&!isNaN(v)?fmt(Number(v)):'');});
     csv+='\n';
+    if(inQ!=null)vals.inQ.push(inQ);
+    if(outQ!=null)vals.outQ.push(outQ);
+    ['inCod','inNh3','inTn','inTp','cod','nh3','tn','tp'].forEach(function(k){var v=rec[k];if(v!=null&&!isNaN(v))vals[k].push(Number(v));});
   }
   function st(a){if(!a.length)return null;var s=0,mx=a[0],mn=a[0];a.forEach(function(v){s+=v;mx=Math.max(mx,v);mn=Math.min(mn,v);});return {max:mx,min:mn,avg:Math.round(s/a.length*100)/100};}
   var stats={};keys.forEach(function(k){stats[k]=st(vals[k]);});
@@ -2117,6 +2134,7 @@ function renderStats(){
   if(type==='sched'){renderSched(ym);return;}
   if(type==='redRep'){renderRedRep(ym);return;}
   if(type==='selfCheck'){renderSelfCheck(ym);return;}
+  if(type==='monitor'){dailyAvgMonth=ym;renderDailyAvg('statsBody');return;}
   var cfg=STAT_CFG[type];
   var rows=DB.ledgers[cfg.src].filter(function(r){return inPeriod(r[cfg.dk],mode,ym);});
   var h='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' '+document.getElementById('s_type').selectedOptions[0].text+'</h2>';
@@ -2218,10 +2236,10 @@ function schedData(ym){
     if(mon.inNh3!=null)pols.inNh3.push(num(mon.inNh3));
     if(mon.inTn!=null)pols.inTn.push(num(mon.inTn));
     if(mon.inTp!=null)pols.inTp.push(num(mon.inTp));
-    if(mon.outCod!=null)pols.outCod.push(num(mon.outCod));
-    if(mon.outNh3!=null)pols.outNh3.push(num(mon.outNh3));
-    if(mon.outTn!=null)pols.outTn.push(num(mon.outTn));
-    if(mon.outTp!=null)pols.outTp.push(num(mon.outTp));
+    if(mon.cod!=null)pols.outCod.push(num(mon.cod));
+    if(mon.nh3!=null)pols.outNh3.push(num(mon.nh3));
+    if(mon.tn!=null)pols.outTn.push(num(mon.tn));
+    if(mon.tp!=null)pols.outTp.push(num(mon.tp));
   }
   function avg(arr){return arr.length?Math.round(arr.reduce(function(a,b){return a+b;},0)/arr.length*100)/100:'';}
   var abnormalMarks=getAbnRecords().filter(function(r){return (r.date||'').slice(0,7)===ym;}).length;
@@ -2248,7 +2266,11 @@ function exportSchedDoc(ym){
   var dataTab='<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:11px;text-align:center">'
     +'<tr><td></td><td>流量（吨/小时）</td><td>COD（mg/L）</td><td>氨氮（mg/L）</td><td>总氮（mg/L）</td><td>总磷（mg/L）</td></tr>'
     +'<tr><td>进口</td><td>'+d.avg.inQ+'</td><td>'+d.avg.inCod+'</td><td>'+d.avg.inNh3+'</td><td>'+d.avg.inTn+'</td><td>'+d.avg.inTp+'</td></tr>'
-    +'<tr><td>出口</td><td>'+d.avg.outQ+'</td><td>'+d.avg.outCod+'</td><td>'+d.avg.outNh3+'</td><td>'+d.avg.outTn+'</td><td>'+d.avg.outTp+'</td></tr>'
+    +'<tr><td>出口</td><td>'+d.avg.outQ+'</td>'
+    +'<td'+(d.avg.outCod!==''&&Number(d.avg.outCod)>50?' class="over-red"':'')+'>'+d.avg.outCod+'</td>'
+    +'<td'+(d.avg.outNh3!==''&&Number(d.avg.outNh3)>5?' class="over-red"':'')+'>'+d.avg.outNh3+'</td>'
+    +'<td'+(d.avg.outTn!==''&&Number(d.avg.outTn)>15?' class="over-red"':'')+'>'+d.avg.outTn+'</td>'
+    +'<td'+(d.avg.outTp!==''&&Number(d.avg.outTp)>0.5?' class="over-red"':'')+'>'+d.avg.outTp+'</td></tr>'
     +'</table>';
   var body='<h1 style="text-align:center;font-size:20px">甘肃省城镇污水处理厂运行调度表</h1>'
     +'<p style="text-align:center">（'+d.y+'年'+d.m+'月）</p>'
