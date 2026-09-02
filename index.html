@@ -629,7 +629,7 @@ function seed(){
 }
 
 /* ================= 导航 ================= */
-var curLedger='water', curFileCat='异常报告', curMrCat='每月水质监测', sludgeSub='prod', chemSub='day', dailyAvgMonth='';
+var curLedger='water', curFileCat='异常报告', curMrCat='每月水质监测', sludgeSub='prod', chemSub='day', dailyAvgMonth='', chemChartIdx=0;
 var sludgePeriod={mode:'month',ym:thisMonth()};
 function go(v,sub){
   document.querySelectorAll('.view').forEach(function(e){e.classList.remove('active');});
@@ -1312,7 +1312,7 @@ var LEDGERS={
  electric:{name:'电费台账',attach:'发票',fields:[{k:'month',l:'月份',t:'month'},{k:'oldKwh',l:'老厂用电量(度)'},{k:'oldFee',l:'老厂电费(元)'},{k:'newKwh',l:'新厂用电量(度)'},{k:'newFee',l:'新厂电费(元)'},{k:'note',l:'备注',t:'text'}],computed:[{l:'总用电量(度)',fn:function(r){return Math.round((num(r.oldKwh)+num(r.newKwh))*100)/100;}},{l:'总电费(元)',fn:function(r){return Math.round((num(r.oldFee)+num(r.newFee))*100)/100;}}]},
  chemical:{name:'药剂台账(kg)',fields:[{k:'date',l:'日期',t:'date'},{k:'pac',l:'PAC'},{k:'c10',l:'次氯酸钠'},{k:'salt',l:'无碘盐'},{k:'carbon',l:'复合碳源'},{k:'pam',l:'PAM'},{k:'fe',l:'铁盐'},{k:'lime',l:'石灰'}]},
  dailyavg:{name:'日均值统计',fields:[]},
- chemStock:{name:'药剂月度库存',hidden:true,fields:[{k:'month',l:'月份',t:'month'},{k:'item',l:'药剂',t:'sel',opts:['PAC','次氯酸钠','无碘盐','复合碳源','PAM','铁盐','石灰']},{k:'inQty',l:'本月入库量(kg)'},{k:'lastBal',l:'上月结余(kg)'},{k:'curBal',l:'本月剩余(kg)'},{k:'note',l:'备注',t:'text'}]},
+ chemStock:{name:'药剂月度库存',hidden:true,fields:[{k:'month',l:'月份',t:'month'},{k:'item',l:'药剂',t:'sel',opts:['PAC','次氯酸钠','无碘盐','复合碳源','PAM','铁盐','石灰']},{k:'inQty',l:'本月采购量(kg)'},{k:'lastBal',l:'上月剩余库存量(kg)'},{k:'curBal',l:'本月剩余库存量(kg)'},{k:'note',l:'备注',t:'text'}]},
  invoice:{name:'发票记录',fields:[{k:'date',l:'日期',t:'date'},{k:'type',l:'发票类型',t:'text'},{k:'amount',l:'金额(元)'},{k:'no',l:'票号',t:'text'},{k:'note',l:'备注',t:'text'}]},
  chlorine:{name:'加氯量表',fields:[]},
  lab:{name:'化验记录表',fields:[{k:'date',l:'日期',t:'date'},{k:'sample',l:'水样',t:'sel',opts:['进水','出水','1#','2#','3#','4#','5#']},{k:'time',l:'取样时间',t:'text'},{k:'cod',l:'COD(mg/L)'},{k:'nh3',l:'NH3-N(mg/L)'},{k:'tp',l:'TP(mg/L)'},{k:'tn',l:'TN(mg/L)'},{k:'ss',l:'SS(mg/L)'},{k:'bod',l:'BOD(mg/L)'},{k:'sv30',l:'SV30(%)'},{k:'mlssL',l:'MLSS液位'},{k:'mlss',l:'MLSS化验数据'},{k:'water',l:'污泥含水率(%)'}]},
@@ -2126,6 +2126,69 @@ function exportWaterDoc(ym,mode){
     +'<td style="width:34%;border:none;font-size:11pt;text-align:right">编制日期：'+cnDate(todayStr())+'</td></tr></table>';
   exportWord('进出水量统计表_'+periodSlug(mode,ym)+'.doc',body);
 }
+/* ================= 药剂用量报表（含采购量/上月结余/本月剩余，点击卡片切换柱状图） ================= */
+function renderChemReport(ym,mode){
+  mode=mode||'month';
+  var cfg=STAT_CFG.chemical;
+  var rows=DB.ledgers[cfg.src].filter(function(r){return inPeriod(r[cfg.dk],mode,ym);}).sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
+  var h='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' 药剂用量报表</h2>';
+  if(!rows.length){document.getElementById('statsBody').innerHTML=h+'<div class="muted">该期间暂无数据，请先在「台账中心 → 药剂台账 → 每日用量」录入或导入。</div>';return;}
+  var y=+ym.slice(0,4),m=+ym.slice(5,7);
+  var stockYm;
+  if(mode==='month') stockYm=ym.slice(0,7);
+  else if(mode==='quarter'){var qm=Math.ceil(m/3)*3;stockYm=y+'-'+String(qm).padStart(2,'0');}
+  else stockYm=y+'-12';
+  function stockOf(item){return (DB.ledgers.chemStock||[]).find(function(r){return r.month===stockYm&&r.item===item;});}
+  var items=cfg.cols.map(function(c){return {k:c.k,l:c.l.replace(/\(kg\)/g,'')};});
+  var usage={},mx={},mn={};
+  items.forEach(function(it){usage[it.k]=0;mx[it.k]=-1e18;mn[it.k]=1e18;});
+  rows.forEach(function(r){items.forEach(function(it){var v=num(r[it.k]);usage[it.k]+=v;mx[it.k]=Math.max(mx[it.k],v);mn[it.k]=Math.min(mn[it.k],v);});});
+  items.forEach(function(it){if(mn[it.k]===1e18)mn[it.k]=0;if(mx[it.k]===-1e18)mx[it.k]=0;});
+  h+='<div class="stat-cards">';
+  items.forEach(function(it,idx){
+    var sum=usage[it.k];var st=stockOf(it.l);var active=idx===chemChartIdx;
+    h+='<div class="stat-card" onclick="chemChartIdx='+idx+';renderChemReport(\''+ym+'\',\''+mode+'\')" style="cursor:pointer;border:2px solid '+(active?'var(--blue-d)':'transparent')+'">';
+    h+='<div class="v">'+fmt(sum)+'</div>';
+    h+='<div class="k">'+it.l+'(kg) 合计</div>';
+    h+='<div class="k">日均 '+fmt(sum/rows.length)+' ｜ 最高 '+fmt(mx[it.k])+' ｜ 最低 '+fmt(mn[it.k])+'</div>';
+    h+='<div class="k" style="margin-top:4px;color:var(--blue-d)">采购 '+(st&&st.inQty!=null?fmt(st.inQty):'-')+' ｜ 上月结余 '+(st&&st.lastBal!=null?fmt(st.lastBal):'-')+' ｜ 本月剩余 '+(st&&st.curBal!=null?fmt(st.curBal):'-')+'</div>';
+    h+='</div>';
+  });
+  h+='<div class="stat-card"><div class="v">'+rows.length+'</div><div class="k">记录条数</div></div></div>';
+  var selected=items[chemChartIdx]||items[0];
+  var pts=[];
+  if(mode==='year'){
+    for(var mm=1;mm<=12;mm++){var key=y+'-'+String(mm).padStart(2,'0');var s=0;DB.ledgers.chemical.forEach(function(r){if((r.date||'').slice(0,7)===key)s+=num(r[selected.k]);});pts.push({label:mm+'月',v:s});}
+  }else{
+    rows.forEach(function(r){pts.push({label:(r.date||'').slice(5),v:num(r[selected.k])});});
+  }
+  var maxV=1;pts.forEach(function(p){maxV=Math.max(maxV,p.v);});
+  var W=Math.max(620,pts.length*34),H=180,svg='<svg viewBox="0 0 '+W+' '+(H+26)+'" style="width:100%;min-width:420px">';
+  pts.forEach(function(p,i){
+    var bw2=Math.min(26,(W/pts.length)-8),x=i*(W/pts.length)+(W/pts.length-bw2)/2,hh=p.v/maxV*(H-24);
+    svg+='<rect x="'+x+'" y="'+(H-hh)+'" width="'+bw2+'" height="'+hh+'" rx="3" fill="#2f7fd6"><title>'+p.label+'：'+fmt(p.v)+'</title></rect>';
+    if(pts.length<=31)svg+='<text x="'+(x+bw2/2)+'" y="'+(H+16)+'" text-anchor="middle" font-size="10" fill="#6b8aad">'+p.label+'</text>';
+  });
+  svg+='</svg>';
+  h+='<div class="chart-box" style="margin-bottom:14px"><div class="muted" style="margin-bottom:6px">'+selected.l+'(kg) 分布（点击上方卡片切换药剂）</div>'+svg+'</div>';
+  h+='<div class="tbwrap" style="margin-bottom:14px"><table class="tb"><thead><tr><th>药剂</th><th>使用量(kg)</th><th>采购量(kg)</th><th>上月剩余库存(kg)</th><th>本月剩余库存(kg)</th></tr></thead><tbody>';
+  items.forEach(function(it){
+    var st=stockOf(it.l);
+    h+='<tr><td>'+it.l+'</td><td>'+fmt(usage[it.k])+'</td><td>'+(st&&st.inQty!=null?fmt(st.inQty):'-')+'</td><td>'+(st&&st.lastBal!=null?fmt(st.lastBal):'-')+'</td><td>'+(st&&st.curBal!=null?fmt(st.curBal):'-')+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div class="tbwrap"><table class="tb"><thead><tr><th>日期</th>';
+  cfg.cols.forEach(function(c){h+='<th>'+c.l+'</th>';});
+  h+='</tr></thead><tbody>';
+  rows.forEach(function(r){
+    h+='<tr><td>'+r.date+'</td>';
+    cfg.cols.forEach(function(c){h+='<td>'+fmt(num(r[c.k]))+'</td>';});
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportChemReportCSV(\''+ym+'\',\''+mode+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出本报表 CSV</button></div>';
+  document.getElementById('statsBody').innerHTML=h;
+}
 function renderStats(){
   var type=document.getElementById('s_type').value,mode=document.getElementById('s_period').value;
   var ym=document.getElementById('s_month').value||thisMonth();
@@ -2135,6 +2198,7 @@ function renderStats(){
   if(type==='redRep'){renderRedRep(ym);return;}
   if(type==='selfCheck'){renderSelfCheck(ym);return;}
   if(type==='monitor'){dailyAvgMonth=ym;renderDailyAvg('statsBody');return;}
+  if(type==='chemical'){renderChemReport(ym,mode);return;}
   var cfg=STAT_CFG[type];
   var rows=DB.ledgers[cfg.src].filter(function(r){return inPeriod(r[cfg.dk],mode,ym);});
   var h='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' '+document.getElementById('s_type').selectedOptions[0].text+'</h2>';
@@ -2461,10 +2525,35 @@ function exportSelfCheckDoc(ym){
   exportWord('厂内自检报告_'+ym+'.doc',body);
 }
 
+function exportChemReportCSV(ym,mode){
+  mode=mode||'month';
+  var cfg=STAT_CFG.chemical;
+  var rows=DB.ledgers[cfg.src].filter(function(r){return inPeriod(r[cfg.dk],mode,ym);}).sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
+  var y=+ym.slice(0,4),m=+ym.slice(5,7);
+  var stockYm;
+  if(mode==='month') stockYm=ym.slice(0,7);
+  else if(mode==='quarter'){var qm=Math.ceil(m/3)*3;stockYm=y+'-'+String(qm).padStart(2,'0');}
+  else stockYm=y+'-12';
+  function stockOf(item){return (DB.ledgers.chemStock||[]).find(function(r){return r.month===stockYm&&r.item===item;});}
+  var items=cfg.cols.map(function(c){return {k:c.k,l:c.l.replace(/\(kg\)/g,'')};});
+  var usage={};items.forEach(function(it){usage[it.k]=0;});
+  rows.forEach(function(r){items.forEach(function(it){usage[it.k]+=num(r[it.k]);});});
+  var csv='﻿'+periodName(mode,ym)+' 药剂用量报表\n';
+  csv+='药剂,使用量(kg),采购量(kg),上月剩余库存(kg),本月剩余库存(kg)\n';
+  items.forEach(function(it){
+    var st=stockOf(it.l);
+    csv+=it.l+','+usage[it.k]+','+(st&&st.inQty!=null?st.inQty:'')+','+(st&&st.lastBal!=null?st.lastBal:'')+','+(st&&st.curBal!=null?st.curBal:'')+'\n';
+  });
+  csv+='\n日期,'+cfg.cols.map(function(c){return c.l;}).join(',')+'\n';
+  rows.forEach(function(r){csv+=r.date+','+cfg.cols.map(function(c){return num(r[c.k]);}).join(',')+'\n';});
+  download(csv,periodName(mode,ym)+'药剂用量报表.csv','text/csv');
+}
+
 function exportStatsCSV(){
   var type=document.getElementById('s_type').value,mode=document.getElementById('s_period').value;
   if(type==='water'){exportWaterCSV(document.getElementById('s_month').value||thisMonth(),mode);return;}
   if(type==='chlorine'){exportChlorineReport(document.getElementById('s_month').value||thisMonth(),mode);return;}
+  if(type==='chemical'){exportChemReportCSV(document.getElementById('s_month').value||thisMonth(),mode);return;}
   if(type==='sched'){exportSchedCSV(document.getElementById('s_month').value||thisMonth());return;}
   if(type==='redRep'){exportRedDoc(document.getElementById('s_month').value||thisMonth());return;}
   if(type==='selfCheck'){exportSelfCheckCSV(document.getElementById('s_month').value||thisMonth());return;}
