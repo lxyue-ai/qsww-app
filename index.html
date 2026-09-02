@@ -628,7 +628,7 @@ function seed(){
 }
 
 /* ================= 导航 ================= */
-var curLedger='water', curFileCat='异常报告', curMrCat='每月水质监测', sludgeSub='prod', chemSub='day';
+var curLedger='water', curFileCat='异常报告', curMrCat='每月水质监测', sludgeSub='prod', chemSub='day', dailyAvgMonth='';
 var sludgePeriod={mode:'month',ym:thisMonth()};
 function go(v,sub){
   document.querySelectorAll('.view').forEach(function(e){e.classList.remove('active');});
@@ -1308,13 +1308,14 @@ var LEDGERS={
  transfer:{name:'污泥转运',hidden:true,attach:'过磅单',fields:[{k:'date',l:'转运日期',t:'date'},{k:'net',l:'净重(T)'},{k:'plate',l:'车牌号',t:'text'},{k:'driver',l:'运输人员',t:'text'},{k:'note',l:'备注',t:'text'}]},
  electric:{name:'电费台账',attach:'发票',fields:[{k:'month',l:'月份',t:'month'},{k:'oldKwh',l:'老厂用电量(度)'},{k:'oldFee',l:'老厂电费(元)'},{k:'newKwh',l:'新厂用电量(度)'},{k:'newFee',l:'新厂电费(元)'},{k:'note',l:'备注',t:'text'}],computed:[{l:'总用电量(度)',fn:function(r){return Math.round((num(r.oldKwh)+num(r.newKwh))*100)/100;}},{l:'总电费(元)',fn:function(r){return Math.round((num(r.oldFee)+num(r.newFee))*100)/100;}}]},
  chemical:{name:'药剂台账(kg)',fields:[{k:'date',l:'日期',t:'date'},{k:'pac',l:'PAC'},{k:'c10',l:'次氯酸钠'},{k:'salt',l:'无碘盐'},{k:'carbon',l:'复合碳源'},{k:'pam',l:'PAM'},{k:'fe',l:'铁盐'},{k:'lime',l:'石灰'}]},
+ dailyavg:{name:'日均值统计',fields:[]},
  chemStock:{name:'药剂月度库存',hidden:true,fields:[{k:'month',l:'月份',t:'month'},{k:'item',l:'药剂',t:'sel',opts:['PAC','次氯酸钠','无碘盐','复合碳源','PAM','铁盐','石灰']},{k:'inQty',l:'本月入库量(kg)'},{k:'lastBal',l:'上月结余(kg)'},{k:'curBal',l:'本月剩余(kg)'},{k:'note',l:'备注',t:'text'}]},
  invoice:{name:'发票记录',fields:[{k:'date',l:'日期',t:'date'},{k:'type',l:'发票类型',t:'text'},{k:'amount',l:'金额(元)'},{k:'no',l:'票号',t:'text'},{k:'note',l:'备注',t:'text'}]},
  chlorine:{name:'加氯量表',fields:[]},
  lab:{name:'化验记录表',fields:[{k:'date',l:'日期',t:'date'},{k:'sample',l:'水样',t:'sel',opts:['进水','出水','1#','2#','3#','4#','5#']},{k:'time',l:'取样时间',t:'text'},{k:'cod',l:'COD(mg/L)'},{k:'nh3',l:'NH3-N(mg/L)'},{k:'tp',l:'TP(mg/L)'},{k:'tn',l:'TN(mg/L)'},{k:'ss',l:'SS(mg/L)'},{k:'bod',l:'BOD(mg/L)'},{k:'sv30',l:'SV30(%)'},{k:'mlssL',l:'MLSS液位'},{k:'mlss',l:'MLSS化验数据'},{k:'water',l:'污泥含水率(%)'}]},
  docentry:{name:'发文登记',attach:'归档',fields:[{k:'date',l:'日期',t:'date'},{k:'toOrg',l:'主送机关',t:'text'},{k:'ccOrg',l:'抄送机关',t:'text'},{k:'docNo',l:'发文字号',t:'text'},{k:'summary',l:'摘由',t:'text'}]}
 };
-var LEDGER_TABS=['water','chlorine','production','dispatch','reduction','lab','electric','chemical','invoice','docentry'];
+var LEDGER_TABS=['water','dailyavg','chlorine','production','dispatch','reduction','lab','electric','chemical','invoice','docentry'];
 var curEdit={cat:null,id:null};
 
 /* ================= 台账渲染 ================= */
@@ -1326,6 +1327,7 @@ function renderLedger(){
     tb.innerHTML='<button class="btn ghost sm" onclick="openImport(\''+curLedger+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导入表格</button><span class="muted" style="margin-left:8px;font-size:13px">支持 Excel/CSV，自动识别列并追加记录</span>';
   }else{tb.innerHTML='';}
   if(curLedger==='chemical'){renderChem();return;}
+  if(curLedger==='dailyavg'){renderDailyAvg();return;}
   if(curLedger==='chlorine'){renderChlorine();return;}
   if(curLedger==='electric'){renderElectric();return;}
   renderGenericLedger(curLedger);
@@ -1409,6 +1411,70 @@ function renderElectricChart(data,title,color){
   });
   svg+='</svg>';
   el.innerHTML=svg;
+}
+/* ================= 在线监测数据日均值统计表（从 DB.monitor 自动取数） ================= */
+function renderDailyAvg(){
+  var ym=dailyAvgMonth||thisMonth();
+  var y=+ym.slice(0,4),m=+ym.slice(5,7);
+  var daysInMonth=new Date(y,m,0).getDate();
+  var keys=['inQ','inCod','inNh3','inTn','inTp','outQ','cod','nh3','tn','tp'];
+  var vals={};keys.forEach(function(k){vals[k]=[];});
+  var rows=[];
+  for(var d=1;d<=daysInMonth;d++){
+    var ds=ym+'-'+String(d).padStart(2,'0');
+    var rec=DB.monitor[ds]||{};
+    var row={d:d,ds:ds};
+    keys.forEach(function(k){
+      var v=rec[k];
+      if(v!=null&&!isNaN(v)){row[k]=Number(v);vals[k].push(Number(v));}else{row[k]=null;}
+    });
+    rows.push(row);
+  }
+  function st(a){if(!a.length)return null;var s=0,mx=a[0],mn=a[0];a.forEach(function(v){s+=v;mx=Math.max(mx,v);mn=Math.min(mn,v);});return {max:mx,min:mn,avg:Math.round(s/a.length*100)/100};}
+  var stats={};keys.forEach(function(k){stats[k]=st(vals[k]);});
+  var h='<div class="section-note">自动从每日上传的「进水口 + 排污口」监测表格中提取日均值。进口为各指标日均值；出口 COD/氨氮/总氮/总磷按环保部门口径：日均值 = 去除当日最大值后的平均值。底部自动计算月最大、最小、平均值。</div>';
+  h+='<div class="row" style="margin-bottom:12px"><div class="fld" style="width:180px"><label>月份</label><input type="month" id="da_month" value="'+ym+'" onchange="dailyAvgMonth=this.value;renderDailyAvg()"></div><button class="btn ghost" onclick="exportDailyAvgCSV()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button></div>';
+  h+='<h2 style="margin-bottom:6px;text-align:center">清水县污水处理厂 '+y+'年'+m+'月份在线监测数据日均值统计表</h2>';
+  h+='<div class="tbwrap"><table class="tb water-rpt"><thead>';
+  h+='<tr><th rowspan="2">时间</th><th colspan="5">进口</th><th colspan="5">出口</th></tr>';
+  h+='<tr><th>流量(m³/h)</th><th>COD(mg/l)</th><th>氨氮(mg/l)</th><th>总氮(mg/l)</th><th>总磷(mg/l)</th><th>流量(m³/h)</th><th>COD(mg/l)</th><th>氨氮(mg/l)</th><th>总氮(mg/l)</th><th>总磷(mg/l)</th></tr>';
+  h+='</thead><tbody>';
+  rows.forEach(function(r){
+    h+='<tr><td>'+r.d+'日</td>';
+    keys.forEach(function(k){h+='<td>'+fe(r[k])+'</td>';});
+    h+='</tr>';
+  });
+  ['最大值','最小值','平均值'].forEach(function(label,idx){
+    var type=['max','min','avg'][idx];
+    h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>'+label+'</td>';
+    keys.forEach(function(k){var s=stats[k];h+='<td>'+(s?fe(s[type]):'-')+'</td>';});
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>';
+  document.getElementById('ledgerBody').innerHTML=h;
+}
+function exportDailyAvgCSV(){
+  var ym=dailyAvgMonth||thisMonth();
+  var y=+ym.slice(0,4),m=+ym.slice(5,7);
+  var daysInMonth=new Date(y,m,0).getDate();
+  var keys=['inQ','inCod','inNh3','inTn','inTp','outQ','cod','nh3','tn','tp'];
+  var vals={};keys.forEach(function(k){vals[k]=[];});
+  var csv='﻿清水县污水处理厂'+y+'年'+m+'月份在线监测数据日均值统计表\n时间,进口,,,,,出口,,,,,\n日期,流量(m³/h),COD(mg/l),氨氮(mg/l),总氮(mg/l),总磷(mg/l),流量(m³/h),COD(mg/l),氨氮(mg/l),总氮(mg/l),总磷(mg/l)\n';
+  for(var d=1;d<=daysInMonth;d++){
+    var ds=ym+'-'+String(d).padStart(2,'0');
+    var rec=DB.monitor[ds]||{};
+    csv+=d+'日';
+    keys.forEach(function(k){var v=rec[k];if(v!=null&&!isNaN(v)){csv+=','+fmt(Number(v));vals[k].push(Number(v));}else{csv+=',';}});
+    csv+='\n';
+  }
+  function st(a){if(!a.length)return null;var s=0,mx=a[0],mn=a[0];a.forEach(function(v){s+=v;mx=Math.max(mx,v);mn=Math.min(mn,v);});return {max:mx,min:mn,avg:Math.round(s/a.length*100)/100};}
+  var stats={};keys.forEach(function(k){stats[k]=st(vals[k]);});
+  ['最大值','最小值','平均值'].forEach(function(label){
+    csv+=label;
+    keys.forEach(function(k){var s=stats[k];csv+=','+(s?fmt(s[label==='最大值'?'max':label==='最小值'?'min':'avg']):'');});
+    csv+='\n';
+  });
+  download(csv,'在线监测日均值统计表_'+ym+'.csv','text/csv');
 }
 /* ================= 加氯量表（水量×7/1000 自动计算） ================= */
 var chlorineMonth='';
