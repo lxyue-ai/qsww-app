@@ -1317,7 +1317,7 @@ var LEDGERS={
  chlorine:{name:'加氯量表',fields:[]},
  lab:{name:'化验记录表',fields:[{k:'date',l:'日期',t:'date'},{k:'sample',l:'水样',t:'sel',opts:['进水','出水','1#','2#','3#','4#','5#']},{k:'time',l:'取样时间',t:'text'},{k:'cod',l:'COD(mg/L)'},{k:'nh3',l:'NH3-N(mg/L)'},{k:'tp',l:'TP(mg/L)'},{k:'tn',l:'TN(mg/L)'},{k:'ss',l:'SS(mg/L)'},{k:'bod',l:'BOD(mg/L)'},{k:'sv30',l:'SV30(%)'},{k:'mlssL',l:'MLSS液位'},{k:'mlss',l:'MLSS化验数据'},{k:'water',l:'污泥含水率(%)'}]},
  docentry:{name:'发文登记',attach:'归档',fields:[{k:'date',l:'日期',t:'date'},{k:'toOrg',l:'主送机关',t:'text'},{k:'ccOrg',l:'抄送机关',t:'text'},{k:'docNo',l:'发文字号',t:'text'},{k:'summary',l:'摘由',t:'text'}]},
- reductionSum:{name:'减排情况汇总表',fields:[{k:'month',l:'月份',t:'month'},{k:'inWater',l:'累计进水量(万m3)'},{k:'outWater',l:'累计出水量(万m3)'},{k:'sludge',l:'含固率60%污泥处理量(吨)'},{k:'power',l:'用电量(千瓦时)'},{k:'floc',l:'絮凝剂用量(kg)'},{k:'codIn',l:'进口COD(mg/l)'},{k:'bodIn',l:'进口BOD5(mg/l)'},{k:'ssIn',l:'进口SS(mg/l)'},{k:'nh3In',l:'进口氨氮(mg/l)'},{k:'tnIn',l:'进口总氮(mg/l)'},{k:'tpIn',l:'进口总磷(mg/l)'},{k:'codOut',l:'出口COD(mg/l)'},{k:'bodOut',l:'出口BOD5(mg/l)'},{k:'ssOut',l:'出口SS(mg/l)'},{k:'nh3Out',l:'出口氨氮(mg/l)'},{k:'tnOut',l:'出口总氮(mg/l)'},{k:'tpOut',l:'出口总磷(mg/l)'},{k:'note',l:'备注',t:'text'}]}
+ reductionSum:{name:'减排情况汇总表',fields:[{k:'month',l:'月份',t:'month'},{k:'inWater',l:'累计进水量(万m3)'},{k:'outWater',l:'累计出水量(万m3)'},{k:'sludge',l:'污泥转运量(吨)'},{k:'power',l:'用电量(千瓦时)'},{k:'floc',l:'絮凝剂用量(kg)'},{k:'codIn',l:'进口COD(mg/l)'},{k:'bodIn',l:'进口BOD5(mg/l)'},{k:'ssIn',l:'进口SS(mg/l)'},{k:'nh3In',l:'进口氨氮(mg/l)'},{k:'tnIn',l:'进口总氮(mg/l)'},{k:'tpIn',l:'进口总磷(mg/l)'},{k:'codOut',l:'出口COD(mg/l)'},{k:'bodOut',l:'出口BOD5(mg/l)'},{k:'ssOut',l:'出口SS(mg/l)'},{k:'nh3Out',l:'出口氨氮(mg/l)'},{k:'tnOut',l:'出口总氮(mg/l)'},{k:'tpOut',l:'出口总磷(mg/l)'},{k:'note',l:'备注',t:'text'}]}
 };
 var LEDGER_TABS=['water','dailyavg','chlorine','production','dispatch','reduction','reductionSum','lab','electric','chemical','invoice','docentry'];
 var curEdit={cat:null,id:null};
@@ -2461,7 +2461,7 @@ function redAutoFill(ym){
   var power=0;
   (DB.ledgers.electric||[]).forEach(function(r){if((r.month||'').slice(0,7)===ym)power+=num(r.oldKwh)+num(r.newKwh);});
   if(!power)monthRows('production',ym).forEach(function(r){power+=num(r.power);});
-  var cake=0;monthRows('sludge',ym).forEach(function(r){cake+=num(r.plate)+num(r.standby);});
+  var sludge=0;monthRows('transfer',ym).forEach(function(r){sludge+=num(r.net);});
   var pols=[['codIn','inCod'],['nh3In','inNh3'],['tnIn','inTn'],['tpIn','inTp']];
   var avg={};
   pols.forEach(function(p){
@@ -2470,7 +2470,7 @@ function redAutoFill(ym){
     avg[p[0]]=c?Math.round(s/c*100)/100:null;
   });
   return {inWater:sumIn?Math.round(sumIn/10000*100)/100:null,outWater:sumOut?Math.round(sumOut/10000*100)/100:null,
-    power:power||null,sludge:cake?Math.round(cake*0.6*100)/100:null,codIn:avg.codIn,nh3In:avg.nh3In,tnIn:avg.tnIn,tpIn:avg.tpIn};
+    power:power||null,sludge:sludge?Math.round(sludge*100)/100:null,codIn:avg.codIn,nh3In:avg.nh3In,tnIn:avg.tnIn,tpIn:avg.tpIn};
 }
 function redSumCalc(r){
   function t(v){return (v==null||v===''||isNaN(v))?null:Number(v);}
@@ -2537,7 +2537,7 @@ function redSumAutoFill(){
   if(!ym){toast('请先在表单选择月份');return;}
   var a=redAutoFill(ym);
   for(var k in a){if(a[k]!=null){var el=document.getElementById('rs_'+k);if(el)el.value=a[k];}}
-  toast('已自动获取：进/出水量、用电量、含固率60%污泥量、进口COD/氨氮/总氮/总磷均值（BOD5、SS、出口请手动填写）');
+  toast('已自动获取：进/出水量、用电量、当月污泥转运量、进口COD/氨氮/总氮/总磷均值（BOD5、SS、出口请手动填写）');
 }
 function addRedSum(){
   var elm=document.getElementById('rs_month');var ym=elm?elm.value:'';
@@ -2602,7 +2602,7 @@ function exportRedSumDoc(id){
     +'<table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;font-size:13px"><tr><th>项　目</th><th>数　据</th></tr>'
     +'<tr><td>累计进水量（万m3）</td><td>'+(r.inWater!=null?r.inWater:'')+'</td></tr>'
     +'<tr><td>累计出水量（万m3）</td><td>'+(r.outWater!=null?r.outWater:'')+'</td></tr>'
-    +'<tr><td>含固率60%的污泥处理量（吨）</td><td>'+(r.sludge!=null?r.sludge:'')+'</td></tr>'
+    +'<tr><td>污泥转运量（吨）</td><td>'+(r.sludge!=null?r.sludge:'')+'</td></tr>'
     +'<tr><td>进口COD产生量（吨）</td><td>'+(c.cod.gen!=null?c.cod.gen:'')+'</td></tr>'
     +'<tr style="color:#c00"><td>出口COD排放量（吨）</td><td>'+(c.cod.emi!=null?c.cod.emi:'')+'</td></tr>'
     +'<tr style="color:#c00"><td>COD减排量（吨）</td><td>'+(c.cod.red!=null?c.cod.red:'')+'</td></tr>'
