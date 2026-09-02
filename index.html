@@ -1306,7 +1306,7 @@ var LEDGERS={
   computed:[{l:'溢流时长',fn:function(r){if(!r.open||!r.close)return '-';var ms=new Date(r.close)-new Date(r.open);if(ms<0)return '-';return Math.floor(ms/3600000)+'小时'+Math.round(ms%3600000/60000)+'分钟';}}]},
  sludge:{name:'污泥台账',fields:[{k:'date',l:'日期',t:'date'},{k:'plate',l:'板框产泥量(T)'},{k:'standby',l:'待机产泥量(T)'},{k:'hours',l:'脱水机运行(h)'},{k:'dest',l:'处置去向',t:'text'}],computed:[{l:'总泥饼量(T)',fn:function(r){return Math.round((num(r.plate)+num(r.standby))*1000)/1000;}}]},
  transfer:{name:'污泥转运',hidden:true,attach:'过磅单',fields:[{k:'date',l:'转运日期',t:'date'},{k:'net',l:'净重(T)'},{k:'plate',l:'车牌号',t:'text'},{k:'driver',l:'运输人员',t:'text'},{k:'note',l:'备注',t:'text'}]},
- electric:{name:'电费台账',attach:'发票',fields:[{k:'month',l:'月份',t:'month'},{k:'oldKwh',l:'老厂用电量(度)'},{k:'oldFee',l:'老厂电费(元)'},{k:'newKwh',l:'新厂用电量(度)'},{k:'newFee',l:'新厂电费(元)'},{k:'note',l:'备注',t:'text'}]},
+ electric:{name:'电费台账',attach:'发票',fields:[{k:'month',l:'月份',t:'month'},{k:'oldKwh',l:'老厂用电量(度)'},{k:'oldFee',l:'老厂电费(元)'},{k:'newKwh',l:'新厂用电量(度)'},{k:'newFee',l:'新厂电费(元)'},{k:'note',l:'备注',t:'text'}],computed:[{l:'总用电量(度)',fn:function(r){return Math.round((num(r.oldKwh)+num(r.newKwh))*100)/100;}},{l:'总电费(元)',fn:function(r){return Math.round((num(r.oldFee)+num(r.newFee))*100)/100;}}]},
  chemical:{name:'药剂台账(kg)',fields:[{k:'date',l:'日期',t:'date'},{k:'pac',l:'PAC'},{k:'c10',l:'次氯酸钠'},{k:'salt',l:'无碘盐'},{k:'carbon',l:'复合碳源'},{k:'pam',l:'PAM'},{k:'fe',l:'铁盐'},{k:'lime',l:'石灰'}]},
  chemStock:{name:'药剂月度库存',hidden:true,fields:[{k:'month',l:'月份',t:'month'},{k:'item',l:'药剂',t:'sel',opts:['PAC','次氯酸钠','无碘盐','复合碳源','PAM','铁盐','石灰']},{k:'inQty',l:'本月入库量(kg)'},{k:'lastBal',l:'上月结余(kg)'},{k:'curBal',l:'本月剩余(kg)'},{k:'note',l:'备注',t:'text'}]},
  invoice:{name:'发票记录',fields:[{k:'date',l:'日期',t:'date'},{k:'type',l:'发票类型',t:'text'},{k:'amount',l:'金额(元)'},{k:'no',l:'票号',t:'text'},{k:'note',l:'备注',t:'text'}]},
@@ -1327,10 +1327,93 @@ function renderLedger(){
   }else{tb.innerHTML='';}
   if(curLedger==='chemical'){renderChem();return;}
   if(curLedger==='chlorine'){renderChlorine();return;}
+  if(curLedger==='electric'){renderElectric();return;}
   renderGenericLedger(curLedger);
+}
+/* ================= 电费台账（每月总计用电量/电费 + 筛选 + 柱状图） ================= */
+function renderElectric(){
+  var cfg=LEDGERS.electric;
+  var idP='lf_electric_';
+  var all=(DB.ledgers.electric||[]).slice();
+  var q=(electricQ||'').trim().toLowerCase();
+  var rows=all.filter(function(r){
+    if(!q)return true;
+    return ((r.month||'')+' '+(r.note||'')).toLowerCase().indexOf(q)>=0;
+  }).sort(function(a,b){return (b.month||'').localeCompare(a.month||'');});
+  var totKwh=0,totFee=0,oldK=0,newK=0,oldF=0,newF=0;
+  rows.forEach(function(r){totKwh+=num(r.oldKwh)+num(r.newKwh);totFee+=num(r.oldFee)+num(r.newFee);oldK+=num(r.oldKwh);newK+=num(r.newKwh);oldF+=num(r.oldFee);newF+=num(r.newFee);});
+  totKwh=Math.round(totKwh*100)/100;totFee=Math.round(totFee*100)/100;oldK=Math.round(oldK*100)/100;newK=Math.round(newK*100)/100;oldF=Math.round(oldF*100)/100;newF=Math.round(newF*100)/100;
+  var editing=(curEdit.cat==='electric'&&curEdit.id)?DB.ledgers.electric.find(function(x){return x.id===curEdit.id;}):null;
+  var h='<div class="section-note">每月电费台账：自动合计「总用电量 = 老厂用电量 + 新厂用电量」「总电费 = 老厂电费 + 新厂电费」。可按月份或备注筛选查找，并查看各月用电量 / 电费柱状图。</div>';
+  /* 汇总卡片 */
+  h+='<div class="sludge-bar">'
+    +'<div class="stat-card"><div class="v">'+fmt(totKwh)+' 度</div><div class="k">'+(q?'筛选后':'累计')+'总用电量</div></div>'
+    +'<div class="stat-card"><div class="v num-red">¥'+fmt(totFee)+'</div><div class="k">'+(q?'筛选后':'累计')+'总电费</div></div>'
+    +'<div class="stat-card"><div class="v">'+fmt(oldK)+' 度</div><div class="k">老厂用电量</div></div>'
+    +'<div class="stat-card"><div class="v">'+fmt(newK)+' 度</div><div class="k">新厂用电量</div></div>'
+    +'<div class="stat-card"><div class="v num-red">¥'+fmt(oldF)+'</div><div class="k">老厂电费</div></div>'
+    +'<div class="stat-card"><div class="v num-red">¥'+fmt(newF)+'</div><div class="k">新厂电费</div></div>'
+    +'</div>';
+  /* 添加/编辑表单 */
+  h+='<div class="grid3" style="margin-bottom:10px">';
+  cfg.fields.forEach(function(f){
+    var val=(editing&&editing[f.k]!=null)?editing[f.k]:'';
+    var inp;
+    if(f.t==='month')inp='<input type="month" id="'+idP+f.k+'" value="'+val+'">';
+    else if(f.t==='text')inp='<input type="text" id="'+idP+f.k+'" placeholder="'+f.l+'" value="'+esc(val)+'">';
+    else inp='<input type="number" id="'+idP+f.k+'" inputmode="decimal" value="'+val+'">';
+    h+='<div class="fld"><label>'+f.l+'</label>'+inp+'</div>';
+  });
+  h+='</div><div class="row" style="margin-bottom:14px"><button class="btn" onclick="addLedgerRow(\'electric\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>'+(editing?'保存修改':'添加记录')+'</button>'+(editing?'<button class="btn ghost" onclick="cancelLedgerEdit()">取消</button>':'')+(IMPORT_MAP.electric?'<button class="btn ghost" onclick="openImport(\'electric\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导入表格</button>':'')+'</div>';
+  /* 筛选框 */
+  h+='<div class="row" style="margin-bottom:10px"><div class="fld" style="flex:1;min-width:220px"><label>筛选查找（月份或备注，如 2026-03 / 3月 / 维修）</label><input type="text" id="electricQ" value="'+esc(electricQ)+'" oninput="electricQ=this.value;renderElectric()"></div><span class="muted" style="align-self:flex-end">共 '+rows.length+' 条</span></div>';
+  /* 柱状图指标切换 */
+  h+='<div class="row" style="margin-bottom:6px"><span class="muted">柱状图指标：</span>'
+    +'<button class="subtab'+(electricChartMetric==='kwh'?' active':'')+'" onclick="electricChartMetric=\'kwh\';renderElectric()">用电量(度)</button>'
+    +'<button class="subtab'+(electricChartMetric==='fee'?' active':'')+'" onclick="electricChartMetric=\'fee\';renderElectric()">电费(元)</button></div>';
+  h+='<div class="tbwrap" style="margin-bottom:14px"><div id="electricChart"></div></div>';
+  /* 明细表 */
+  h+='<div class="tbwrap"><table class="tb"><thead><tr><th>月份</th><th>老厂用电量(度)</th><th>老厂电费(元)</th><th>新厂用电量(度)</th><th>新厂电费(元)</th><th>总用电量(度)</th><th>总电费(元)</th><th>备注</th><th></th></tr></thead><tbody>';
+  if(!rows.length)h+='<tr><td colspan="9" class="muted">暂无记录</td></tr>';
+  rows.forEach(function(r){
+    var k=Math.round((num(r.oldKwh)+num(r.newKwh))*100)/100, f=Math.round((num(r.oldFee)+num(r.newFee))*100)/100;
+    h+='<tr><td>'+esc(r.month||'')+'</td>'
+      +'<td>'+fmt(num(r.oldKwh))+'</td>'
+      +'<td><span class="num-red">¥'+fmt(num(r.oldFee))+'</span></td>'
+      +'<td>'+fmt(num(r.newKwh))+'</td>'
+      +'<td><span class="num-red">¥'+fmt(num(r.newFee))+'</span></td>'
+      +'<td><b>'+fmt(k)+'</b></td>'
+      +'<td><b><span class="num-red">¥'+fmt(f)+'</span></b></td>'
+      +'<td>'+(r.note?esc(r.note):'')+'</td>'
+      +'<td><button class="iconbtn" title="编辑" onclick="ledgerEdit(\'electric\',\''+r.id+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16v4zM14 6l4 4"/></svg></button><button class="iconbtn" title="删除" onclick="delLedgerRow(\'electric\',\''+r.id+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13"/></svg></button></td></tr>';
+  });
+  h+='</tbody></table></div>';
+  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportCSV(\'electric\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button></div>';
+  document.getElementById('ledgerBody').innerHTML=h;
+  /* 渲染柱状图 */
+  var chartData=rows.map(function(r){return {label:(r.month||'').slice(5),value: electricChartMetric==='kwh'?Math.round((num(r.oldKwh)+num(r.newKwh))*100)/100:Math.round((num(r.oldFee)+num(r.newFee))*100)/100,title:(r.month||'')};});
+  renderElectricChart(chartData, electricChartMetric==='kwh'?'各月总用电量（度）':'各月总电费（元）', electricChartMetric==='kwh'?'#2f7fd6':'#e0607e');
+}
+function renderElectricChart(data,title,color){
+  var el=document.getElementById('electricChart');if(!el)return;
+  if(!data.length){el.innerHTML='<div class="muted" style="padding:18px;text-align:center">暂无数据可绘图</div>';return;}
+  var max=1;data.forEach(function(x){max=Math.max(max,x.value);});
+  var n=data.length,W=Math.max(360,n*42),H=220,bw=Math.max(14,Math.min(34,Math.floor(W/n-12))),slot=W/n;
+  var svg='<svg viewBox="0 0 '+W+' '+(H+40)+'" style="width:100%;min-width:360px">';
+  svg+='<text x="6" y="16" font-size="13" fill="#3a5a78" font-weight="600">'+title+'</text>';
+  data.forEach(function(x,i){
+    var x0=i*slot+slot/2-bw/2, h1=x.value/max*(H-40);
+    svg+='<rect x="'+x0+'" y="'+(H-h1)+'" width="'+bw+'" height="'+h1+'" rx="4" fill="'+color+'"><title>'+x.title+'：'+fmt(x.value)+'</title></rect>';
+    svg+='<text x="'+(i*slot+slot/2)+'" y="'+(H-h1-5)+'" text-anchor="middle" font-size="11" fill="#3a5a78">'+fmt(x.value)+'</text>';
+    svg+='<text x="'+(i*slot+slot/2)+'" y="'+(H+18)+'" text-anchor="middle" font-size="12" fill="#6b8aad">'+x.label+'</text>';
+  });
+  svg+='</svg>';
+  el.innerHTML=svg;
 }
 /* ================= 加氯量表（水量×7/1000 自动计算） ================= */
 var chlorineMonth='';
+/* 电费台账：筛选词 + 柱状图指标（kwh 用电量 / fee 电费） */
+var electricQ='',electricChartMetric='kwh';
 function renderChlorine(){
   var ym=chlorineMonth||thisMonth();
   var daysInMonth=new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate();
@@ -1826,7 +1909,7 @@ var STAT_CFG={
  water:{src:'water',cols:[{k:'inflow',l:'进水量(m³)'},{k:'outflow',l:'出水量(m³)'}],dk:'date'},
  production:{src:'production',cols:[{k:'inflow',l:'进水量(m³)'},{k:'outflow',l:'出水量(m³)'},{k:'chem',l:'药剂量(kg)'},{k:'cake',l:'泥饼量(T)'},{k:'hours',l:'脱泥机运行(h)'},{k:'power',l:'用电量(kW·h)'}],dk:'date'},
  chemical:{src:'chemical',cols:[{k:'pac',l:'PAC(kg)'},{k:'c10',l:'次氯酸钠(kg)'},{k:'salt',l:'无碘盐(kg)'},{k:'carbon',l:'复合碳源(kg)'},{k:'pam',l:'PAM(kg)'},{k:'fe',l:'铁盐(kg)'},{k:'lime',l:'石灰(kg)'}],dk:'date'},
- electric:{src:'electric',cols:[{k:'oldKwh',l:'老厂用电量(度)'},{k:'oldFee',l:'老厂电费(元)'},{k:'newKwh',l:'新厂用电量(度)'},{k:'newFee',l:'新厂电费(元)'}],dk:'month'},
+ electric:{src:'electric',cols:[{k:'oldKwh',l:'老厂用电量(度)'},{k:'oldFee',l:'老厂电费(元)'},{k:'newKwh',l:'新厂用电量(度)'},{k:'newFee',l:'新厂电费(元)'},{k:'totalKwh',l:'总用电量(度)',fn:function(r){return Math.round((num(r.oldKwh)+num(r.newKwh))*100)/100;}},{k:'totalFee',l:'总电费(元)',fn:function(r){return Math.round((num(r.oldFee)+num(r.newFee))*100)/100;}}],dk:'month'},
  sludge:{src:'sludge',cols:[{k:'total',l:'总泥饼量(T)',fn:function(r){return Math.round((num(r.plate)+num(r.standby))*1000)/1000;}},{k:'plate',l:'板框产泥量(T)'},{k:'standby',l:'待机产泥量(T)'},{k:'hours',l:'脱水机运行(h)'}],dk:'date'},
  transfer:{src:'transfer',cols:[{k:'net',l:'净重(T)'}],dk:'date'},
  reduction:{src:'reduction',cols:[{k:'blower',l:'鼓风机(h)'},{k:'pump',l:'提升泵(h)'},{k:'dewat',l:'污泥脱水机(h)'},{k:'decant',l:'滗水器(h)'}],dk:'date'}
