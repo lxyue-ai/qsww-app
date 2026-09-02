@@ -1431,7 +1431,7 @@ function renderChlorine(){
   }
   h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fmt(sumW)+'</td><td>'+fmt(Math.round(sumC*1000)/1000)+'</td></tr>';
   h+='</tbody></table></div>';
-  document.getElementById('sludgeBody').innerHTML=h;
+  document.getElementById('ledgerBody').innerHTML=h;
 }
 function exportChlorine(){
   var ym=chlorineMonth||thisMonth();
@@ -1853,7 +1853,7 @@ function renderChem(){
     +'<button class="subtab'+(chemSub==='day'?' active':'')+'" onclick="chemSub=\'day\';renderChem()">每日用量</button>'
     +'<button class="subtab'+(chemSub==='stock'?' active':'')+'" onclick="chemSub=\'stock\';renderChem()">月度库存（入库/结余）</button>'
     +'</div><div id="chemSubBody"></div>';
-  document.getElementById('sludgeBody').innerHTML=h;
+  document.getElementById('ledgerBody').innerHTML=h;
   renderGenericInto(chemSub==='day'?'chemical':'chemStock','chemSubBody');
 }
 
