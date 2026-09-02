@@ -2877,13 +2877,21 @@ function buildSyncPayload(){
   if(c.ledgers)for(var k in c.ledgers){if(Array.isArray(c.ledgers[k]))c.ledgers[k].forEach(function(r){if(r&&r.img)delete r.img;});}
   return c;
 }
+function natKeyOf(lk,r){
+  if(!r||typeof r!=='object')return null;
+  if(r.date)return 'd:'+r.date;
+  if(lk==='reductionSum'||lk==='chemStock'){if(r.month)return 'm:'+r.month;}
+  if(lk==='electric'){if(r.year&&r.month)return 'ym:'+r.year+'-'+r.month;}
+  return null;
+}
 function mergeDB(remote){
   if(!remote||typeof remote!=='object')return;
   if(remote.ledgers)for(var lk in remote.ledgers){
     var inc=remote.ledgers[lk]||[],loc=DB.ledgers[lk]||[],map={};
-    loc.forEach(function(r){if(r&&r.id)map[r.id]=r;});
-    inc.forEach(function(r){if(r&&r.id){if(map[r.id]){var m=Object.assign({},r);if(r.img==null&&map[r.id].img!=null)m.img=map[r.id].img;map[r.id]=m;}else map[r.id]=r;}});
-    DB.ledgers[lk]=Object.keys(map).map(function(id){return map[id];});
+    function key(r){var nk=natKeyOf(lk,r);return nk?nk:(r&&r.id?('id:'+r.id):null);}
+    loc.forEach(function(r){if(r){var k=key(r);if(k)map[k]=r;}});
+    inc.forEach(function(r){if(r){var k=key(r);if(k){if(map[k]){var m=Object.assign({},r);if(r.img==null&&map[k].img!=null)m.img=map[k].img;map[k]=m;}else map[k]=r;}}});
+    DB.ledgers[lk]=Object.keys(map).map(function(k){return map[k];});
   }
   if(Array.isArray(remote.reports)){var rm={};DB.reports.forEach(function(r){if(r&&r.id)rm[r.id]=r;});remote.reports.forEach(function(r){if(r&&r.id)rm[r.id]=r;});DB.reports=Object.keys(rm).map(function(id){return rm[id];});}
   if(Array.isArray(remote.files)){var fm={};DB.files.forEach(function(r){if(r&&r.id)fm[r.id]=r;});remote.files.forEach(function(r){if(r&&r.id){var x=Object.assign({},r);if(x.data==null&&fm[r.id]&&fm[r.id].data!=null)x.data=fm[r.id].data;fm[r.id]=x;}});DB.files=Object.keys(fm).map(function(id){return fm[id];});}
