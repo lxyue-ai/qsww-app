@@ -668,7 +668,7 @@ function renderToday(){
 
 /* ================= 驾驶舱 ================= */
 function sumRows(rows,key){var s=0;rows.forEach(function(r){s+=num(r[key]);});return s;}
-function monthRows(cat,ym,dk){return DB.ledgers[cat].filter(function(r){return (r[dk||'date']||'').slice(0,7)===ym;});}
+function monthRows(cat,ym,dk){return (DB.ledgers[cat]||[]).filter(function(r){return (r[dk||'date']||'').slice(0,7)===ym;});}
 function sludgeProdVal(r){return Math.round((num(r.plate)+num(r.standby))*1000)/1000;}  /* 总泥饼量 = 板框产泥量 + 待机产泥量 */
 function sludgeOpenOf(ym){
   /* 某月月初初始库存 = 严格按「上月末剩余」滚动：全局年初基数 + 该月之前所有月份(产生-转运)。不再读取手动登记，避免覆盖自动滚动 */
@@ -2502,8 +2502,8 @@ function renderRedSum(){
     ['inWater','outWater','sludge','power','codIn','nh3In','tnIn','tpIn'].forEach(function(k){
       if(a[k]!=null&&r[k]!==a[k]){r[k]=a[k];upd=true;}
     });
-    if((r.bodIn==null||r.bodIn==='')&&a.bodIn!=null){r.bodIn=a.bodIn;upd=true;}
-    if((r.ssIn==null||r.ssIn==='')&&a.ssIn!=null){r.ssIn=a.ssIn;upd=true;}
+    if(a.bodIn!=null){r.bodIn=a.bodIn;upd=true;}
+    if(a.ssIn!=null){r.ssIn=a.ssIn;upd=true;}
   });
   if(upd)save();
   var all=(DB.ledgers.reductionSum||[]).slice();
