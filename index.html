@@ -3052,6 +3052,18 @@ function natKeyOf(lk,r){
   if(r.date)return 'd:'+r.date;
   if(lk==='reductionSum'||lk==='chemStock'){if(r.month)return 'm:'+r.month;}
   if(lk==='electric'){if(r.year&&r.month)return 'ym:'+r.year+'-'+r.month;}
+  if(lk==='transfer'){
+    /* 污泥转运：同一天可能多车，按业务字段整体作为自然键；内容完全相同才会合并 */
+    var parts=[];
+    ['net','plate','driver','note'].forEach(function(k){parts.push((r[k]!=null?String(r[k]):''));});
+    if(r.date)return 'd:'+r.date+':'+parts.join('|');
+  }
+  if(lk==='sludge'){
+    /* 产泥记录：同一天多条，按业务字段整体作为自然键 */
+    var parts=[];
+    ['plate','standby','hours','dest'].forEach(function(k){parts.push((r[k]!=null?String(r[k]):''));});
+    if(r.date)return 'd:'+r.date+':'+parts.join('|');
+  }
   return null;
 }
 function mergeDB(remote){
