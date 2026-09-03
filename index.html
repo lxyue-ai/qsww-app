@@ -2525,7 +2525,10 @@ function exportSchedDoc(ym){
 function redRepData(ym){
   var sumIn=0,sumOut=0,power=0,cake=0,pam=0;
   monthRows('water',ym).forEach(function(r){sumIn+=num(r.inflow);sumOut+=num(r.outflow);});
-  monthRows('production',ym).forEach(function(r){power+=num(r.power);cake+=num(r.cake);});
+  (DB.ledgers.electric||[]).forEach(function(r){if((r.month||'').slice(0,7)===ym)power+=num(r.oldKwh)+num(r.newKwh);});
+  if(!power)monthRows('production',ym).forEach(function(r){power+=num(r.power);});
+  monthRows('transfer',ym).forEach(function(r){cake+=num(r.net);});
+  if(!cake)monthRows('production',ym).forEach(function(r){cake+=num(r.cake);});
   monthRows('chemical',ym).forEach(function(r){pam+=num(r.pam);});
   var pols=[['COD','inCod','cod'],['氨氮','inNh3','nh3'],['总氮','inTn','tn'],['总磷','inTp','tp']];
   var pr=[],avgIn={},avgOut={};
@@ -2543,22 +2546,12 @@ function redRepData(ym){
     avgIn[p[0]]=cI?Math.round(sI/cI*100)/100:null;
     avgOut[p[0]]=cO?Math.round(sO/cO*100)/100:null;
   });
-  // 从化验记录表计算 BOD5、SS 月均值（bod 对应 BOD5，ss 对应 SS）
-  var labSum={bod:{in:0,out:0,cIn:0,cOut:0},ss:{in:0,out:0,cIn:0,cOut:0}};
-  monthRows('lab',ym).forEach(function(r){
-    var v,sm=r.sample;
-    if(sm==='进水'){
-      v=num(r.bod);if(v){labSum.bod.in+=v;labSum.bod.cIn++;}
-      v=num(r.ss);if(v){labSum.ss.in+=v;labSum.ss.cIn++;}
-    }else if(sm==='出水'){
-      v=num(r.bod);if(v){labSum.bod.out+=v;labSum.bod.cOut++;}
-      v=num(r.ss);if(v){labSum.ss.out+=v;labSum.ss.cOut++;}
-    }
-  });
-  avgIn['BOD5']=labSum.bod.cIn?Math.round(labSum.bod.in/labSum.bod.cIn*100)/100:null;
-  avgOut['BOD5']=labSum.bod.cOut?Math.round(labSum.bod.out/labSum.bod.cOut*100)/100:null;
-  avgIn['SS']=labSum.ss.cIn?Math.round(labSum.ss.in/labSum.ss.cIn*100)/100:null;
-  avgOut['SS']=labSum.ss.cOut?Math.round(labSum.ss.out/labSum.ss.cOut*100)/100:null;
+  // BOD5、SS 进口按国家常规设计值自动填写：BOD5 取 150 且不超过当月进口COD均值，SS 取 200
+  var codInAvg=avgIn['COD'];
+  avgIn['BOD5']=codInAvg!=null?Math.min(150,Math.round(codInAvg*100)/100):150;
+  avgOut['BOD5']=null;
+  avgIn['SS']=200;
+  avgOut['SS']=null;
   return {sumIn:sumIn,sumOut:sumOut,power:power,cake:Math.round(cake*10)/10,pam:pam,pr:pr,avgIn:avgIn,avgOut:avgOut,
     inWan:Math.round(sumIn),outWan:Math.round(sumOut),
     cost:sumIn?Math.round(power/sumIn*100)/100:0};
@@ -2621,6 +2614,7 @@ function redAutoFill(ym){
   (DB.ledgers.electric||[]).forEach(function(r){if((r.month||'').slice(0,7)===ym)power+=num(r.oldKwh)+num(r.newKwh);});
   if(!power)monthRows('production',ym).forEach(function(r){power+=num(r.power);});
   var sludge=0;monthRows('transfer',ym).forEach(function(r){sludge+=num(r.net);});
+  var floc=0;monthRows('chemical',ym).forEach(function(r){floc+=num(r.pam);});
   var pols=[['codIn','inCod'],['nh3In','inNh3'],['tnIn','inTn'],['tpIn','inTp']];
   var avg={};
   pols.forEach(function(p){
@@ -2631,7 +2625,8 @@ function redAutoFill(ym){
   /* BOD5/SS 进口平均值按国家常规设计进水取值自动编写：BOD5 取 150 且不超过当月进口COD均值，SS 取 200 */
   var bodIn=(avg.codIn!=null)?Math.min(150,avg.codIn):150;
   return {inWater:sumIn?Math.round(sumIn):null,outWater:sumOut?Math.round(sumOut):null,
-    power:power||null,sludge:sludge?Math.round(sludge*100)/100:null,codIn:avg.codIn,bodIn:bodIn,ssIn:200,nh3In:avg.nh3In,tnIn:avg.tnIn,tpIn:avg.tpIn};
+    power:power||null,sludge:sludge?Math.round(sludge*100)/100:null,floc:floc||null,
+    codIn:avg.codIn,bodIn:bodIn,ssIn:200,nh3In:avg.nh3In,tnIn:avg.tnIn,tpIn:avg.tpIn};
 }
 function redSumCalc(r){
   function t(v){return (v==null||v===''||isNaN(v))?null:Number(v);}
@@ -2654,11 +2649,11 @@ function renderRedSum(){
     if(r.outWater!=null&&!isNaN(r.outWater)&&Number(r.outWater)<5000){r.outWater=Math.round(Number(r.outWater)*10000);mig=true;}
   });
   if(mig)save();
-  /* 自动刷新：进/出水量(水量台账)、用电量(电费台账当月总电量)、污泥处置量(污泥转运量)、进口浓度(监控数据)随源数据自动更新修正；BOD5/SS 为空时按国家常规设计值自动填写 */
+  /* 自动刷新：进/出水量(水量台账)、用电量(电费台账当月总电量)、污泥处置量(污泥转运量)、絮凝剂(PAM合计)、进口浓度(监控数据)随源数据自动更新修正；BOD5/SS 为空时按国家常规设计值自动填写 */
   var upd=false;(DB.ledgers.reductionSum||[]).forEach(function(r){
     if(!r||!r.month)return;
     var a=redAutoFill(r.month);
-    ['inWater','outWater','sludge','power','codIn','nh3In','tnIn','tpIn'].forEach(function(k){
+    ['inWater','outWater','sludge','power','floc','codIn','nh3In','tnIn','tpIn'].forEach(function(k){
       if(a[k]!=null&&r[k]!==a[k]){r[k]=a[k];upd=true;}
     });
     if(a.bodIn!=null){r.bodIn=a.bodIn;upd=true;}
