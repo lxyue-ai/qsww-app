@@ -200,6 +200,39 @@
   @media (max-width:720px){.grid{grid-template-columns:1fr;}.field.full{grid-column:1;}
     .kpis{grid-template-columns:1fr 1fr;}}
   @media print{.noprint{display:none!important;}}
+
+  /* ===== 视觉优化：类别彩色标签 ===== */
+  .tag{display:inline-block;background:#eef3fb;color:var(--blue);border-radius:20px;
+    padding:2px 9px;font-size:12px;white-space:nowrap;border:1px solid transparent;}
+  .tag.cod{background:#eaf2ff;color:#1a5fb4;border-color:#bcd8f5;}
+  .tag.ammonia{background:#eafaf0;color:#2e8b57;border-color:#bfe6cd;}
+  .tag.tn{background:#fff3e6;color:#c8651b;border-color:#f3d3ad;}
+  .tag.tp{background:#fdeef4;color:#c2185b;border-color:#f3c4d6;}
+  .tag.ph{background:#f0ecff;color:#6a3ad6;border-color:#d6c8f5;}
+  .tag.ss{background:#eef6f6;color:#0f7d7d;border-color:#c2e0e0;}
+  .tag.flow{background:#eef1f6;color:#475569;border-color:#cfd6e2;}
+  .tag.sludge{background:#f3efe6;color:#8a6d3b;border-color:#e0d4b8;}
+  .tag.other{background:#f1f1f1;color:#666;border-color:#ddd;}
+  /* 批复状态徽标 */
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:12px;white-space:nowrap;border:1px solid transparent;}
+  .badge.ok{background:#eafaf0;color:#2e8b57;border-color:#bfe6cd;}
+  .badge.no{background:#f1f1f1;color:#999;border-color:#ddd;}
+  /* 明细页顶部速览条 */
+  .list-summary{display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 12px;}
+  .list-summary .chip{background:#fff;border:1px solid var(--line);border-radius:999px;
+    padding:6px 14px;font-size:13px;color:#444;display:inline-flex;align-items:center;gap:7px;}
+  .list-summary .chip b{color:var(--red);font-size:15px;font-weight:800;}
+  .list-summary .chip .dot{width:8px;height:8px;border-radius:50%;background:var(--red);}
+  /* 录入表单分组卡片 */
+  .form-stack{display:flex;flex-direction:column;gap:14px;}
+  .fgroup{background:#fbfcfe;border:1px solid #eef1f6;border-radius:10px;padding:14px 16px 16px;}
+  .fgroup-h{font-size:13px;font-weight:800;color:var(--red);margin-bottom:12px;
+    display:flex;align-items:center;gap:8px;letter-spacing:.3px;}
+  .fgroup-h .no{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;
+    background:var(--red);color:#fff;border-radius:50%;font-size:12px;}
+  .fgroup .grid{margin:0;}
+  /* 溢流录入镜像优化 */
+  .ov-field-note{font-size:12px;color:#888;margin-top:2px;}
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="jszip.min.js"></script>
@@ -266,48 +299,63 @@
     <div class="card">
       <h3>登记一条异常申报</h3>
       <div class="hint">填完点「保存」，记录即进入台账；之后在「台账明细」里可一键<b>生成申报表</b>（按你给的官方 PDF 版面，可下载 <b>Word</b> 或 <b>PDF</b>，也可直接打印）。关联文件夹默认按异常日期自动归入 <b id="hintBase">3、异常申报</b> 的对应月份子文件夹，支持手动修改。</div>
-      <div class="grid">
-        <div class="field"><label>异常日期<span class="req">*</span></label>
-          <input type="date" id="f_date"></div>
-        <div class="field full"><label>污染物类别<span class="req">*</span>（同一条异常可多选）</label>
-          <div class="catbox" id="f_cat">
-            <label class="cb"><input type="checkbox" value="COD"> COD</label>
-            <label class="cb"><input type="checkbox" value="氨氮"> 氨氮</label>
-            <label class="cb"><input type="checkbox" value="总氮"> 总氮</label>
-            <label class="cb"><input type="checkbox" value="总磷"> 总磷</label>
-            <label class="cb"><input type="checkbox" value="pH"> pH</label>
-            <label class="cb"><input type="checkbox" value="SS"> SS</label>
-            <label class="cb"><input type="checkbox" value="流量"> 流量</label>
-            <label class="cb"><input type="checkbox" value="污泥"> 污泥</label>
-            <label class="cb"><input type="checkbox" value="其他"> 其他</label>
+      <div class="form-stack">
+        <div class="fgroup">
+          <div class="fgroup-h"><span class="no">1</span>基础信息</div>
+          <div class="grid">
+            <div class="field"><label>异常日期<span class="req">*</span></label>
+              <input type="date" id="f_date"></div>
+            <div class="field full"><label>污染物类别<span class="req">*</span>（同一条异常可多选）</label>
+              <div class="catbox" id="f_cat">
+                <label class="cb"><input type="checkbox" value="COD"> COD</label>
+                <label class="cb"><input type="checkbox" value="氨氮"> 氨氮</label>
+                <label class="cb"><input type="checkbox" value="总氮"> 总氮</label>
+                <label class="cb"><input type="checkbox" value="总磷"> 总磷</label>
+                <label class="cb"><input type="checkbox" value="pH"> pH</label>
+                <label class="cb"><input type="checkbox" value="SS"> SS</label>
+                <label class="cb"><input type="checkbox" value="流量"> 流量</label>
+                <label class="cb"><input type="checkbox" value="污泥"> 污泥</label>
+                <label class="cb"><input type="checkbox" value="其他"> 其他</label>
+              </div>
+              <div style="font-size:12px;color:#888;margin-top:2px">勾选全部适用类别即可；无需多选时只勾一个。</div>
+            </div>
+            <div class="field"><label>自动监控现场端名称</label>
+              <input type="text" id="f_site" placeholder="如：污水处理厂出口总磷在线监测设备"></div>
           </div>
-          <div style="font-size:12px;color:#888;margin-top:2px">勾选全部适用类别即可；无需多选时只勾一个。</div>
         </div>
-        <div class="field"><label>自动监控现场端名称</label>
-          <input type="text" id="f_site" placeholder="如：污水处理厂出口总磷在线监测设备"></div>
-        <div class="field full"><label>异常现象<span class="req">*</span></label>
-          <textarea id="f_phen" placeholder="如：出口总氮在线分析仪数据波动/缺失，仪表更换期间无法上传"></textarea></div>
-        <div class="field full"><label>原因分析<span class="req">*</span></label>
-          <textarea id="f_cause" placeholder="如：仪表故障，已联系第三方运维更换，期间辅以手工监测"></textarea></div>
-        <div class="field"><label>预计恢复时间<span class="opt">（可选，可精确到小时）</span></label>
-          <input type="datetime-local" id="f_est" step="3600"></div>
-        <div class="field"><label>填表人 / 运维</label>
-          <input type="text" id="f_rep" placeholder="填表人，第三方运维人员"></div>
-        <div class="field full"><label>关联文件夹（可选，用于本地归档）</label>
-          <input type="text" id="f_folder" placeholder="如 E:\工作台\3、异常申报\8月"></div>
-        <div class="field full">
-          <label>盖章申报表扫描件（图片 / PDF）</label>
-          <input type="file" id="f_report_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
-          <button type="button" class="btn sm blue" id="btnPickReport" onclick="document.getElementById('f_report_file').click()">📎 选择图片 / PDF</button>
-          <div class="upload-preview" id="reportPreview"></div>
-          <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf，可一次选多张，文件直接存在浏览器本地。</div>
+        <div class="fgroup">
+          <div class="fgroup-h"><span class="no">2</span>异常详情</div>
+          <div class="grid">
+            <div class="field full"><label>异常现象<span class="req">*</span></label>
+              <textarea id="f_phen" placeholder="如：出口总氮在线分析仪数据波动/缺失，仪表更换期间无法上传"></textarea></div>
+            <div class="field full"><label>原因分析<span class="req">*</span></label>
+              <textarea id="f_cause" placeholder="如：仪表故障，已联系第三方运维更换，期间辅以手工监测"></textarea></div>
+            <div class="field"><label>预计恢复时间<span class="opt">（可选，可精确到小时）</span></label>
+              <input type="datetime-local" id="f_est" step="3600"></div>
+            <div class="field"><label>填表人 / 运维</label>
+              <input type="text" id="f_rep" placeholder="填表人，第三方运维人员"></div>
+          </div>
         </div>
-        <div class="field full">
-          <label>其他相关附件（图片 / PDF）</label>
-          <input type="file" id="f_att_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
-          <button type="button" class="btn sm blue" id="btnPickAtt" onclick="document.getElementById('f_att_file').click()">📎 选择图片 / PDF</button>
-          <div class="upload-preview" id="attPreview"></div>
-          <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf 等多种附件。</div>
+        <div class="fgroup">
+          <div class="fgroup-h"><span class="no">3</span>附件与归档</div>
+          <div class="grid">
+            <div class="field full"><label>关联文件夹（可选，用于本地归档）</label>
+              <input type="text" id="f_folder" placeholder="如 E:\工作台\3、异常申报\8月"></div>
+            <div class="field full">
+              <label>盖章申报表扫描件（图片 / PDF）</label>
+              <input type="file" id="f_report_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
+              <button type="button" class="btn sm blue" id="btnPickReport" onclick="document.getElementById('f_report_file').click()">📎 选择图片 / PDF</button>
+              <div class="upload-preview" id="reportPreview"></div>
+              <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf，可一次选多张，文件直接存在浏览器本地。</div>
+            </div>
+            <div class="field full">
+              <label>其他相关附件（图片 / PDF）</label>
+              <input type="file" id="f_att_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
+              <button type="button" class="btn sm blue" id="btnPickAtt" onclick="document.getElementById('f_att_file').click()">📎 选择图片 / PDF</button>
+              <div class="upload-preview" id="attPreview"></div>
+              <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf 等多种附件。</div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="actions">
@@ -335,6 +383,7 @@
         <button class="btn sm gray" id="btnExpExcel">导出Excel</button>
         <button class="btn sm gray" id="btnDedup" title="删除完全重复记录，并把同一天的异常合并为单条">🔧 去重合并</button>
       </div>
+      <div class="list-summary" id="abnSummary"></div>
       <div class="scroll-hint">表格较宽，可在下方区域左右滑动查看。</div>
       <div class="table-wrap"><table id="tbl">
         <thead><tr>
@@ -398,44 +447,59 @@
     <div class="card">
       <h3>登记一条溢流记录</h3>
       <div class="hint">填完点「保存」，记录即进入溢流台账；之后在「溢流·明细」里可上传<b>红头文盖章扫描件</b>、<b>打开关联文件夹</b>（本机 file:// 方式生效）。关联文件夹默认按溢流日期自动归入 <b id="hintOvBase">溢流报告</b> 的对应月份子文件夹，可手动修改。</div>
-      <div class="grid">
-        <div class="field"><label>溢流日期<span class="req">*</span></label>
-          <input type="date" id="f_ov_date"></div>
-        <div class="field"><label>溢流类别<span class="req">*</span></label>
-          <select id="f_ov_cat">
-            <option value="雨水">雨水</option><option value="其他">其他</option>
-          </select></div>
-        <div class="field"><label>开阀时间<span class="req">*</span></label>
-          <input type="time" id="f_ov_openTime"></div>
-        <div class="field"><label>开阀时集水井液位 (m)</label>
-          <input type="number" step="0.01" id="f_ov_openLevel" placeholder="如 3.20"></div>
-        <div class="field"><label>开阀时实时进水流量 (m³/h)</label>
-          <input type="number" step="0.1" id="f_ov_openFlow" placeholder="如 1200"></div>
-        <div class="field"><label>关阀时间</label>
-          <input type="time" id="f_ov_closeTime"></div>
-        <div class="field"><label>关阀时集水井液位 (m)</label>
-          <input type="number" step="0.01" id="f_ov_closeLevel" placeholder="如 2.10"></div>
-        <div class="field"><label>关阀时实时进水流量 (m³/h)</label>
-          <input type="number" step="0.1" id="f_ov_closeFlow" placeholder="如 600"></div>
-        <div class="field"><label>申报人 / 填表人</label>
-          <input type="text" id="f_ov_rep" placeholder="填表人 / 第三方运维人员"></div>
-        <div class="field full"><label>溢流原因 / 情况说明</label>
-          <textarea id="f_ov_cause" placeholder="如：强降雨导致进水量远超处理能力；或设备检修等原因（类别选“其他”时请填写具体原因）"></textarea></div>
-        <div class="field full"><label>关联文件夹（可选，用于本地归档）</label>
-          <input type="text" id="f_ov_folder" placeholder="如 E:\工作台\溢流报告\8月"></div>
-        <div class="field full">
-          <label>红头文盖章扫描件（图片 / PDF）</label>
-          <input type="file" id="f_ov_report_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
-          <button type="button" class="btn sm blue" onclick="document.getElementById('f_ov_report_file').click()">📎 选择图片 / PDF</button>
-          <div class="upload-preview" id="ovReportPreview"></div>
-          <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf，可一次选多张，文件直接存在浏览器本地。</div>
+      <div class="form-stack">
+        <div class="fgroup">
+          <div class="fgroup-h"><span class="no">1</span>基础信息</div>
+          <div class="grid">
+            <div class="field"><label>溢流日期<span class="req">*</span></label>
+              <input type="date" id="f_ov_date"></div>
+            <div class="field"><label>溢流类别<span class="req">*</span></label>
+              <select id="f_ov_cat">
+                <option value="雨水">雨水</option><option value="其他">其他</option>
+              </select></div>
+            <div class="field"><label>申报人 / 填表人</label>
+              <input type="text" id="f_ov_rep" placeholder="填表人 / 第三方运维人员"></div>
+          </div>
         </div>
-        <div class="field full">
-          <label>其他相关附件（图片 / PDF）</label>
-          <input type="file" id="f_ov_att_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
-          <button type="button" class="btn sm blue" onclick="document.getElementById('f_ov_att_file').click()">📎 选择图片 / PDF</button>
-          <div class="upload-preview" id="ovAttPreview"></div>
-          <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf 等多种附件。</div>
+        <div class="fgroup">
+          <div class="fgroup-h"><span class="no">2</span>开阀 / 关阀数据</div>
+          <div class="grid">
+            <div class="field"><label>开阀时间<span class="req">*</span></label>
+              <input type="time" id="f_ov_openTime"></div>
+            <div class="field"><label>开阀时集水井液位 (m)</label>
+              <input type="number" step="0.01" id="f_ov_openLevel" placeholder="如 3.20"></div>
+            <div class="field"><label>开阀时实时进水流量 (m³/h)</label>
+              <input type="number" step="0.1" id="f_ov_openFlow" placeholder="如 1200"></div>
+            <div class="field"><label>关阀时间</label>
+              <input type="time" id="f_ov_closeTime"></div>
+            <div class="field"><label>关阀时集水井液位 (m)</label>
+              <input type="number" step="0.01" id="f_ov_closeLevel" placeholder="如 2.10"></div>
+            <div class="field"><label>关阀时实时进水流量 (m³/h)</label>
+              <input type="number" step="0.1" id="f_ov_closeFlow" placeholder="如 600"></div>
+          </div>
+        </div>
+        <div class="fgroup">
+          <div class="fgroup-h"><span class="no">3</span>原因与归档</div>
+          <div class="grid">
+            <div class="field full"><label>溢流原因 / 情况说明</label>
+              <textarea id="f_ov_cause" placeholder="如：强降雨导致进水量远超处理能力；或设备检修等原因（类别选“其他”时请填写具体原因）"></textarea></div>
+            <div class="field full"><label>关联文件夹（可选，用于本地归档）</label>
+              <input type="text" id="f_ov_folder" placeholder="如 E:\工作台\溢流报告\8月"></div>
+            <div class="field full">
+              <label>红头文盖章扫描件（图片 / PDF）</label>
+              <input type="file" id="f_ov_report_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
+              <button type="button" class="btn sm blue" onclick="document.getElementById('f_ov_report_file').click()">📎 选择图片 / PDF</button>
+              <div class="upload-preview" id="ovReportPreview"></div>
+              <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf，可一次选多张，文件直接存在浏览器本地。</div>
+            </div>
+            <div class="field full">
+              <label>其他相关附件（图片 / PDF）</label>
+              <input type="file" id="f_ov_att_file" accept="image/*,.pdf,application/pdf" multiple style="display:none">
+              <button type="button" class="btn sm blue" onclick="document.getElementById('f_ov_att_file').click()">📎 选择图片 / PDF</button>
+              <div class="upload-preview" id="ovAttPreview"></div>
+              <div style="font-size:12px;color:#888;margin-top:4px">支持 jpg / png / gif / pdf 等多种附件。</div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="actions">
@@ -461,6 +525,7 @@
         <input type="file" id="ovImpFile" accept="application/json" style="display:none">
         <input type="file" id="ovExcelFile" accept=".xlsx,.xls" style="display:none">
       </div>
+      <div class="list-summary" id="ovSummary"></div>
       <div class="scroll-hint">表格较宽，可在下方区域左右滑动查看。</div>
       <div class="table-wrap"><table id="ovTbl">
         <thead><tr>
@@ -625,7 +690,10 @@
 var KEY='qsww_abn_ledger_v1', SETKEY='qsww_abn_settings';
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||[];}catch(e){return [];}}
 function save(d){
-  try{localStorage.setItem(KEY,JSON.stringify(d));abnGhSchedulePush();}
+  try{
+    if(Array.isArray(d))d=consolidate(d).records;
+    localStorage.setItem(KEY,JSON.stringify(d));abnGhSchedulePush();
+  }
   catch(e){toast('保存失败：存储空间不足，请减少附件数量或图片大小后重试');}
 }
 function loadSet(){try{return JSON.parse(localStorage.getItem(SETKEY))||{};}catch(e){return {};}}
@@ -656,7 +724,7 @@ function migratePaths(){
   });
   if(changed)save(records);
 }
-var records=load();
+var records=consolidate(load()).records;
 var settings=loadSet();
 if(!settings.baseFolder)settings.baseFolder='E:\\工作台\\3、异常申报';
 if(!localStorage.getItem(KEY)){
@@ -680,8 +748,9 @@ document.getElementById('hintBase').textContent=settings.baseFolder.split('\\').
 var OV_KEY='qsww_overflow_v1';
 var ov_records=[];
 try{ov_records=JSON.parse(localStorage.getItem(OV_KEY)||'[]');}catch(e){}
+ov_records=abnDedupOv(ov_records);
 function ov_save(){
-  try{localStorage.setItem(OV_KEY,JSON.stringify(ov_records));abnGhSchedulePush();}
+  try{ov_records=abnDedupOv(ov_records);localStorage.setItem(OV_KEY,JSON.stringify(ov_records));abnGhSchedulePush();}
   catch(e){toast('保存失败：存储空间不足，请减少附件数量或图片大小后重试');}
 }
 if(!settings.overflowBase)settings.overflowBase='E:\\工作台\\溢流报告';
@@ -697,10 +766,24 @@ function abnGhHeaders(){var c=abnGhConf();return {'Accept':'application/vnd.gith
 function abnB64enc(s){return btoa(unescape(encodeURIComponent(s)));}
 function abnB64dec(s){return decodeURIComponent(escape(atob(s.replace(/\s/g,''))));}
 function abnBuildPayload(){return {records:records,ov_records:ov_records,meta:{updatedAt:Date.now()}};}
+/* 溢流记录按"定义字段"去重（不按日合并，溢流每天可能多起独立事件） */
+function abnDedupOv(arr){
+  if(!Array.isArray(arr))return arr;
+  var seen={},out=[];
+  arr.forEach(function(r){
+    if(!r||!r.id)r.id=uid();
+    var k=(r.date||'')+'|'+(r.cat||'')+'|'+(r.cause||'')+'|'+(r.openTime||'')+'|'+(r.closeTime||'')+'|'+(r.openFlow||'')+'|'+(r.closeFlow||'');
+    if(seen[k])return; seen[k]=1; out.push(r);
+  });
+  return out;
+}
 function abnMerge(remote){
   if(!remote||typeof remote!=='object')return;
   if(Array.isArray(remote.records)){var m={};records.forEach(function(r){if(r&&r.id)m[r.id]=r;});remote.records.forEach(function(r){if(r&&r.id)m[r.id]=r;});records=Object.keys(m).map(function(id){return m[id];});}
   if(Array.isArray(remote.ov_records)){var om={};ov_records.forEach(function(r){if(r&&r.id)om[r.id]=r;});remote.ov_records.forEach(function(r){if(r&&r.id)om[r.id]=r;});ov_records=Object.keys(om).map(function(id){return om[id];});}
+  // 同步即归一化：异常申报去重+同日合并；溢流仅去重。确保任何设备推回的旧数据都不会让重复/拆分记录回流
+  records=consolidate(records).records;
+  ov_records=abnDedupOv(ov_records);
   save(records);ov_save();
 }
 async function abnGhPush(isRetry){
@@ -952,8 +1035,13 @@ function toLocalInput(v){
 }
 function catTagsHtml(r){
   var arr=catArr(r);
-  if(!arr.length)return '<span class="tag">—</span>';
-  return arr.map(function(c){return '<span class="tag">'+esc(c)+'</span>';}).join(' ');
+  if(!arr.length)return '<span class="tag other">—</span>';
+  var cls={};
+  arr.forEach(function(c){cls[c]=1;});
+  return arr.map(function(c){
+    var k={ 'COD':'cod','氨氮':'ammonia','总氮':'tn','总磷':'tp','pH':'ph','SS':'ss','流量':'flow','污泥':'sludge','其他':'other' }[c]||'other';
+    return '<span class="tag '+k+'">'+esc(c)+'</span>';
+  }).join(' ');
 }
 function clearForm(){
   ['f_date','f_site','f_phen','f_cause','f_est','f_rep','f_folder','f_report_file','f_att_file'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
@@ -1077,11 +1165,25 @@ function renderList(){
       '<td data-label="原因分析">'+esc(r.cause)+'</td>'+
       '<td data-label="盖章扫描件">'+(fileCount(r.report)?renderFiles(r.report):'<span style="color:#bbb">未上传</span>')+'</td>'+
       '<td data-label="其他附件">'+renderFiles(r.att)+'</td>'+
-      '<td data-label="是否批复">'+esc(r.approved||'')+'</td>'+
+      '<td data-label="是否批复">'+(r.approved?('<span class="badge ok">'+esc(r.approved)+'</span>'):'<span class="badge no">未批复</span>')+'</td>'+
       '<td data-label="备注">'+esc(r.note||'')+'</td>'+
       '<td class="noprint" data-label="操作">'+opBtns(r)+'</td>';
     tb.appendChild(tr);
   });
+  renderAbnSummary();
+}
+function renderAbnSummary(){
+  var el=document.getElementById('abnSummary');if(!el)return;
+  if(!records.length){el.innerHTML='';return;}
+  var ym=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+  var thisMonth=records.filter(function(r){return (r.date||'').slice(0,7)===ym;}).length;
+  var unapp=records.filter(function(r){return !r.approved;}).length;
+  var byCat={};records.forEach(function(r){catArr(r).forEach(function(cc){byCat[cc]=(byCat[cc]||0)+1;});});
+  var topCat='—',topN=0;for(var k in byCat){if(byCat[k]>topN){topN=byCat[k];topCat=k;}}
+  el.innerHTML='<span class="chip"><span class="dot"></span>累计 <b>'+records.length+'</b> 条</span>'+
+    '<span class="chip">本月 <b>'+thisMonth+'</b> 条</span>'+
+    '<span class="chip">最多类别 <b>'+esc(topCat)+(topN?(' ×'+topN):'')+'</b></span>'+
+    '<span class="chip">未批复 <b>'+unapp+'</b> 条</span>';
 }
 function opBtns(r){
   return '<button class="btn sm rowbtn" onclick="openReportById(\''+r.id+'\')">生成申报表</button>'+
@@ -1771,7 +1873,7 @@ function ov_renderList(){
   rows.forEach(function(r){
     var tr=document.createElement('tr');
     tr.innerHTML='<td data-label="溢流日期">'+cnDate(r.date)+'</td>'+
-      '<td data-label="类别"><span class="tag">'+esc(r.cat)+'</span></td>'+
+      '<td data-label="类别"><span class="tag '+(r.cat==='雨水'?'flow':'other')+'">'+esc(r.cat)+'</span></td>'+
       '<td data-label="开阀时间">'+(r.openTime||'')+'</td>'+
       '<td data-label="开阀液位(m)">'+(r.openLevel||'')+'</td>'+
       '<td data-label="开阀流量">'+(r.openFlow||'')+'</td>'+
@@ -1783,6 +1885,18 @@ function ov_renderList(){
       '<td class="noprint" data-label="操作">'+ov_opBtns(r)+'</td>';
     tb.appendChild(tr);
   });
+  renderOvSummary();
+}
+function renderOvSummary(){
+  var el=document.getElementById('ovSummary');if(!el)return;
+  if(!ov_records.length){el.innerHTML='';return;}
+  var ym=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+  var thisMonth=ov_records.filter(function(r){return (r.date||'').slice(0,7)===ym;}).length;
+  var byCat={};ov_records.forEach(function(r){if(r.cat)byCat[r.cat]=(byCat[r.cat]||0)+1;});
+  var topCat='—',topN=0;for(var k in byCat){if(byCat[k]>topN){topN=byCat[k];topCat=k;}}
+  el.innerHTML='<span class="chip"><span class="dot"></span>累计 <b>'+ov_records.length+'</b> 条</span>'+
+    '<span class="chip">本月 <b>'+thisMonth+'</b> 条</span>'+
+    '<span class="chip">最多类别 <b>'+esc(topCat)+(topN?(' ×'+topN):'')+'</b></span>';
 }
 function ov_opBtns(r){
   return (r.folder?'<span class="btn sm gray rowbtn" style="color:#fff" data-path="'+esc(r.folder)+'" onclick="openLocalFile(this.getAttribute(\'data-path\'))">打开文件夹</span>':'')+
