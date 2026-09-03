@@ -574,7 +574,7 @@ table.tb tbody tr:hover{background:var(--blue-xl)}
   <img id="ghqrimg" src="" alt="二维码" style="max-width:200px;border:1px solid var(--border);border-radius:8px;background:#fff" onerror="this.style.display='none';var u=document.getElementById('ghqrurl');if(u){u.style.display='block';u.textContent='（二维码加载失败，可手动复制地址：'+window.location.href+'）';}">
   <div id="ghqrurl" style="display:none;font-size:12px;color:var(--muted);margin-top:6px;word-break:break-all"></div>
 </div>
-<div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn ghost sm" onclick="closeGh()">关闭</button><button class="btn green sm" onclick="saveGhSettings()">保存并测试</button><button class="btn ghost sm" onclick="ghPull(false);toast('已手动同步')">立即同步</button></div>
+<div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn ghost sm" onclick="closeGh()">关闭</button><button class="btn green sm" onclick="saveGhSettings()">保存并测试</button><button class="btn ghost sm" onclick="ghPull(false);toast('已手动同步')">立即同步</button><button class="btn ghost sm" style="color:var(--red);border-color:var(--red)" onclick="ghPushForce()">强制推送(本机→云端)</button></div>
 </div></div></div>
 <div class="toast" id="toast"></div>
 
@@ -3100,6 +3100,24 @@ async function ghPush(){
     ghStatus('ok');
   }catch(e){console.warn('ghPush',e);ghStatus('err',e.message);throw e;}
 }
+async function ghPushForce(){
+  /* 强制以本机数据覆盖云端：先尝试获取 sha，获取失败也继续 PUT（GitHub 会创建新文件） */
+  if(!ghEnabled()){toast('未配置 GitHub 同步');return;}
+  if(!confirm('⚠️ 此操作会用本机当前全部数据替换云端数据，其他设备上的未同步修改将丢失。确定继续？'))return;
+  ghStatus('ing');
+  try{
+    var c=ghConf(),payload=buildSyncPayload();
+    payload.meta=payload.meta||{};payload.meta.updatedAt=Date.now();
+    var content=b64enc(JSON.stringify(payload));
+    var sha=null;
+    try{var g=await fetch(ghBase()+(c.branch&&c.branch!=='main'?'?ref='+encodeURIComponent(c.branch):''),{headers:ghHeaders()});if(g.ok){var j=await g.json();sha=j.sha;}}catch(e){}
+    var body={message:'force-sync '+new Date().toISOString(),content:content,branch:c.branch||'main'};
+    if(sha)body.sha=sha;
+    var r=await fetch(ghBase(),{method:'PUT',headers:Object.assign({},ghHeaders(),{'Content-Type':'application/json'}),body:JSON.stringify(body)});
+    if(!r.ok){var e=await r.json().catch(function(){return {};});throw new Error(e.message||('HTTP '+r.status));}
+    ghStatus('ok');toast('已强制推送：本机数据已覆盖云端');
+  }catch(e){console.warn('ghPushForce',e);ghStatus('err',e.message);toast('强制推送失败：'+(e.message||e));throw e;}
+}
 async function ghPull(first){
   if(!ghEnabled())return;
   ghStatus('ing');
@@ -3426,7 +3444,8 @@ function openImport(cat){
   var opts='';LEDGERS[cat].fields.forEach(function(f){opts+='<option value="'+f.k+'">'+f.l+'</option>';});
   var box='<div class="imp-modal" id="impModal"><div class="imp-box">'
     +'<h3>导入表格 → '+nf+'</h3>'
-    +'<div class="sub">选择 Excel(.xlsx/.xls) 或 CSV 文件，工作台会自动识别列并预览。水量台账按「日期」覆盖更新已有记录、其余追加；其他台账同日多行会分别保留并累加；仅完全相同的重复行才跳过。</div>'
+    +'<div class="sub">选择 Excel(.xlsx/.xls) 或 CSV 文件，工作台会自动识别列并预览。水量台账默认按「日期」覆盖更新已有记录；其余台账默认追加（同日多行分别保留并累加）。若需「重新上传整月数据」，请勾选下方「覆盖本月旧数据」。</div>'
+    +'<div class="imp-sec"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="impOverwrite" style="width:18px;height:18px"> <b>覆盖本月旧数据</b>（先删除该台账本月已有记录，再导入新数据；多月份导入则覆盖涉及的每个月）</label><div class="muted" style="margin-top:4px">仅在需要整月替换时使用，避免重复记录累积。</div></div>'
     +'<div class="imp-sec"><input type="file" id="impFile" accept=".xlsx,.xls,.csv"></div>'
     +'<div class="imp-err" id="impErr"></div>'
     +'<div id="impBody"></div>'
@@ -3532,10 +3551,26 @@ function updatePreview(){
 function confirmImport(){
   var recs=impState.preview||[];
   if(!recs.length){impErr('没有可导入的数据。');return;}
-  var res=mergeImport(impState.cat,recs);
+  var cat=impState.cat;
+  var overwrite=document.getElementById('impOverwrite')&&document.getElementById('impOverwrite').checked;
+  if(overwrite){
+    var ymSet={},keyF=IMPORT_MAP[cat].date?'date':'month';
+    recs.forEach(function(r){if(r[keyF]){var ym=(r[keyF]||'').slice(0,7);if(ym)ymSet[ym]=1;}});
+    var yms=Object.keys(ymSet);
+    var before=(DB.ledgers[cat]||[]).length;
+    DB.ledgers[cat]=(DB.ledgers[cat]||[]).filter(function(r){
+      if(!r||!r[keyF])return true;
+      var ym=(r[keyF]||'').slice(0,7);
+      return yms.indexOf(ym)<0;
+    });
+    var removed=before-(DB.ledgers[cat]||[]).length;
+  }
+  var res=mergeImport(cat,recs);
   save();closeImport();
-  if(impState.cat==='transfer'||impState.cat==='sludge')renderSludge();else renderLedger();
-  toast('导入完成：新增 '+res.added+' 条'+(res.updated?('，按日期覆盖更新 '+res.updated+' 条'):'')+(res.ignored?('，跳过 '+res.ignored+' 条完全重复'):'')+(res.added&&!res.updated&&cat!=='water'?'（重复日期已分别保留并累加）':''));
+  if(cat==='transfer'||cat==='sludge')renderSludge();else renderLedger();
+  var msg='导入完成：新增 '+res.added+' 条'+(res.updated?('，按日期覆盖更新 '+res.updated+' 条'):'')+(res.ignored?('，跳过 '+res.ignored+' 条完全重复'):'');
+  if(overwrite)msg='已先删除 '+yms.join('、')+' 共 '+removed+' 条旧记录；'+msg;
+  toast(msg);
 }
 
 /* ================= 初始化 ================= */
