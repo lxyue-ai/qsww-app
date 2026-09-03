@@ -671,10 +671,12 @@ function sumRows(rows,key){var s=0;rows.forEach(function(r){s+=num(r[key]);});re
 function monthRows(cat,ym,dk){return (DB.ledgers[cat]||[]).filter(function(r){return (r[dk||'date']||'').slice(0,7)===ym;});}
 function sludgeProdVal(r){return Math.round((num(r.plate)+num(r.standby))*1000)/1000;}  /* 总泥饼量 = 板框产泥量 + 待机产泥量 */
 function sludgeOpenOf(ym){
-  /* 某月月初初始库存 = 严格按「上月末剩余」滚动：全局年初基数 + 该月之前所有月份(产生-转运)。不再读取手动登记，避免覆盖自动滚动 */
+  /* 某月月初初始库存 = 从2026年5月起按「上月末剩余」滚动：5月初始库存=全局基数，之后月份=5月基数 + 该月之前所有月份(产生-转运)。5月之前数据不参与。 */
   var base=num(DB.settings.sludgeBase),pb=0,tb=0;
-  DB.ledgers.sludge.forEach(function(r){if(r.date.slice(0,7)<ym)pb+=sludgeProdVal(r);});
-  DB.ledgers.transfer.forEach(function(r){if(r.date.slice(0,7)<ym)tb+=num(r.net);});
+  var start='2026-05';
+  if(ym<=start)return base;
+  DB.ledgers.sludge.forEach(function(r){var m=r.date.slice(0,7);if(m>=start&&m<ym)pb+=sludgeProdVal(r);});
+  DB.ledgers.transfer.forEach(function(r){var m=r.date.slice(0,7);if(m>=start&&m<ym)tb+=num(r.net);});
   return Math.round((base+pb-tb)*1000)/1000;
 }
 function sludgeStock(ym){
@@ -700,9 +702,9 @@ function sludgeStockPeriod(mode,ym){
     }
     return {open:open,prod:Math.round(prod*1000)/1000,tran:Math.round(tran*1000)/1000,left:Math.round((open+prod-tran)*1000)/1000};
   }
-  var open=sludgeOpenOf(y+'-01');
+  var open=sludgeOpenOf(y+'-05');
   var prod=0,tran=0;
-  for(var mm=1;mm<=12;mm++){
+  for(var mm=5;mm<=12;mm++){
     var mo=y+'-'+String(mm).padStart(2,'0');
     DB.ledgers.sludge.forEach(function(r){if(r.date.slice(0,7)===mo)prod+=sludgeProdVal(r);});
     DB.ledgers.transfer.forEach(function(r){if(r.date.slice(0,7)===mo)tran+=num(r.net);});
@@ -1799,8 +1801,8 @@ function renderSludge(){
   var mode=(sludgePeriod&&sludgePeriod.mode)||'month',ym=(sludgePeriod&&sludgePeriod.ym)||thisMonth();
   var sk=sludgeStockPeriod(mode,ym);
   var labelPrefix=mode==='month'?'本月':mode==='quarter'?'本季度':'本年度';
-  var openLabel=mode==='month'?'本月初始库存':mode==='quarter'?'季初初始库存':'年初初始库存';
-  var openNote=mode==='month'?'（期初=上月末剩余）':mode==='quarter'?'（季度首月期初库存）':'（1月1日期初库存，取自上方基数）';
+  var openLabel=mode==='month'?'本月初始库存':mode==='quarter'?'季初初始库存':'5月初初始库存';
+  var openNote=mode==='month'?'（期初=上月末剩余，5月起滚动）':mode==='quarter'?'（季度首月期初库存，5月起滚动）':'（5月1日期初库存，取自上方基数）';
   var h='<div class="subtabs">'
     +'<button class="subtab'+(sludgeSub==='prod'?' active':'')+'" onclick="sludgeSub=\'prod\';renderSludge()">产泥记录</button>'
     +'<button class="subtab'+(sludgeSub==='transfer'?' active':'')+'" onclick="sludgeSub=\'transfer\';renderSludge()">污泥转运</button>'
@@ -1812,7 +1814,7 @@ function renderSludge(){
     +'<div class="stat-card"><div class="v">'+fmt(sk.open)+' T</div><div class="k">'+openLabel+'</div><div class="muted" style="font-size:11px;margin-top:4px">'+openNote+'</div></div>'
     +'<div class="stat-card"><div class="v'+(sk.left<0?' red':'')+'">'+fmt(sk.left)+' T</div><div class="k">'+labelPrefix+'剩余量</div><div class="muted" style="font-size:11px;margin-top:4px">（期初+产泥-转运）</div></div>'
     +'</div>';
-  h+='<div class="row" style="margin-bottom:14px"><span class="muted">2026年初初始库存基数(T)（仅最早月份用）：</span><input type="number" id="sludgeBase" style="width:120px" value="'+num(DB.settings.sludgeBase)+'" onchange="DB.settings.sludgeBase=num(this.value);save();renderSludge()"><button class="btn ghost sm" onclick="sludgeCalcAvg()">平均反推每日板框产泥量</button></div>';
+  h+='<div class="row" style="margin-bottom:14px"><span class="muted">2026年5月初初始库存基数(T)（仅5月期初用，5月起滚动）：</span><input type="number" id="sludgeBase" style="width:120px" value="'+num(DB.settings.sludgeBase)+'" onchange="DB.settings.sludgeBase=num(this.value);save();renderSludge()"><button class="btn ghost sm" onclick="sludgeCalcAvg()">平均反推每日板框产泥量</button></div>';
   if(sludgeSub==='prod'){
     h+=sludgePeriodBar();
     document.getElementById('sludgeBody').innerHTML=h+'<div id="sludgeSubBody"></div>';
