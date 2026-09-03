@@ -2201,6 +2201,9 @@ function renderStats(){
   if(type==='selfCheck'){renderSelfCheck(ym);return;}
   if(type==='monitor'){dailyAvgMonth=ym;renderDailyAvg('statsBody');return;}
   if(type==='chemical'){renderChemReport(ym,mode);return;}
+  if(type==='production'){renderProductionReport(ym,mode);return;}
+  if(type==='sludge'){renderSludgeReport(ym,mode);return;}
+  if(type==='reduction'){renderReductionReport(ym,mode);return;}
   var cfg=STAT_CFG[type];
   var rows=DB.ledgers[cfg.src].filter(function(r){return inPeriod(r[cfg.dk],mode,ym);});
   var h='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' '+document.getElementById('s_type').selectedOptions[0].text+'</h2>';
@@ -2239,6 +2242,162 @@ function renderStats(){
   h+='</tbody></table></div>';
   h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportStatsCSV()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出本报表 CSV</button></div>';
   document.getElementById('statsBody').innerHTML=h;
+}
+/* ================= 生产量 / 产泥 / 减排运行 报表（自动汇总，不再依赖单独录入） ================= */
+function productionAggMonth(mo){
+  var dim=new Date(+mo.slice(0,4),+mo.slice(5,7),0).getDate(),T={i:0,o:0,cl:0,ch:0,ca:0,po:0,ho:0,n:0};
+  var ele=DB.ledgers.electric.find(function(r){return (r.month||'').slice(0,7)===mo;});
+  for(var d=1;d<=dim;d++){
+    var ds=mo+'-'+String(d).padStart(2,'0');
+    var w=DB.ledgers.water.find(function(r){return r.date===ds;});
+    var chems=DB.ledgers.chemical.filter(function(r){return r.date===ds;});
+    var sl=DB.ledgers.sludge.find(function(r){return r.date===ds;});
+    var inQ=w?num(w.inflow):null,outQ=w?num(w.outflow):null,chemSum=0;
+    chems.forEach(function(r){['pac','c10','salt','carbon','pam','fe','lime'].forEach(function(k){chemSum+=num(r[k]);});});
+    var cake=sl?(num(sl.plate)+num(sl.standby)):null,ho=sl?num(sl.hours):null,cl=inQ!=null?inQ*7/1000:null;
+    if(inQ!=null)T.i+=inQ;if(outQ!=null)T.o+=outQ;if(cl!=null)T.cl+=cl;if(chemSum)T.ch+=chemSum;if(cake!=null)T.ca+=cake;if(ho!=null)T.ho+=ho;if(inQ!=null||outQ!=null)T.n++;
+  }
+  return {m:+mo.slice(5,7),y:+mo.slice(0,4),sumIn:Math.round(T.i*100)/100,sumOut:Math.round(T.o*100)/100,cl:Math.round(T.cl*100)/100,ch:Math.round(T.ch*100)/100,ca:Math.round(T.ca*100)/100,po:ele?Math.round((num(ele.oldKwh)+num(ele.newKwh))*100)/100:null,ho:Math.round(T.ho*100)/100,n:T.n};
+}
+function renderProductionReport(ym,mode){
+  mode=mode||'month';
+  var h='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' 生产量报表（自动汇总）</h2>';
+  h+='<div class="section-note">自动汇总：进水/出水取水量台账；加氯量=进水×7/1000；药剂=当日各药剂求和（药剂台账）；泥饼量=板框+待机（产泥台账）；脱泥机运行=产泥台账运行小时；用电量按当月总用电量÷当月天数估算（电费台账）。无需在「生产量」台账单独录入。</div>';
+  if(mode==='month'){
+    var y=+ym.slice(0,4),m=+ym.slice(5,7),dim=new Date(y,m,0).getDate();
+    var ele=DB.ledgers.electric.find(function(r){return (r.month||'').slice(0,7)===ym;});
+    var eleDay=ele?Math.round((num(ele.oldKwh)+num(ele.newKwh))/dim*100)/100:null,eleTot=ele?Math.round((num(ele.oldKwh)+num(ele.newKwh))*100)/100:null;
+    var rows=[],T={i:0,o:0,cl:0,ch:0,ca:0,po:0,ho:0},n=0;
+    for(var d=1;d<=dim;d++){
+      var ds=ym+'-'+String(d).padStart(2,'0');
+      var w=DB.ledgers.water.find(function(r){return r.date===ds;});
+      var chems=DB.ledgers.chemical.filter(function(r){return r.date===ds;});
+      var sl=DB.ledgers.sludge.find(function(r){return r.date===ds;});
+      var inQ=w?num(w.inflow):null,outQ=w?num(w.outflow):null,chemSum=0;
+      chems.forEach(function(r){['pac','c10','salt','carbon','pam','fe','lime'].forEach(function(k){chemSum+=num(r[k]);});});
+      var cake=sl?Math.round((num(sl.plate)+num(sl.standby))*1000)/1000:null,ho=sl?num(sl.hours):null,cl=inQ!=null?Math.round(inQ*7/1000*1000)/1000:null,po=eleDay;
+      if(inQ!=null)T.i+=inQ;if(outQ!=null)T.o+=outQ;if(cl!=null)T.cl+=cl;if(chemSum)T.ch+=chemSum;if(cake!=null)T.ca+=cake;if(po!=null)T.po+=po;if(ho!=null)T.ho+=ho;
+      if(inQ!=null||outQ!=null||chemSum||cake!=null||po!=null||ho!=null)n++;
+      rows.push({d:d,inQ:inQ,outQ:outQ,cl:cl,chem:chemSum?Math.round(chemSum*100)/100:null,cake:cake,po:po,ho:ho});
+    }
+    if(!n){h+='<div class="muted">该期间暂无数据，请先在「台账中心」录入水量、药剂、产泥等台账。</div>';document.getElementById('statsBody').innerHTML=h;return;}
+    h+='<div class="tbwrap"><table class="tb"><thead><tr><th>日期</th><th>进水量(m³)</th><th>出水量(m³)</th><th>加氯量(kg)</th><th>药剂量(kg)</th><th>泥饼量(T)</th><th>用电量(度/天)</th><th>脱泥机运行(h)</th></tr></thead><tbody>';
+    rows.forEach(function(r){h+='<tr><td>'+r.d+'日</td><td>'+fe(r.inQ)+'</td><td>'+fe(r.outQ)+'</td><td>'+fe(r.cl)+'</td><td>'+fe(r.chem)+'</td><td>'+fe(r.cake)+'</td><td>'+fe(r.po)+'</td><td>'+fe(r.ho)+'</td></tr>';});
+    h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(Math.round(T.i*100)/100)+'</td><td>'+fe(Math.round(T.o*100)/100)+'</td><td>'+fe(Math.round(T.cl*100)/100)+'</td><td>'+fe(Math.round(T.ch*100)/100)+'</td><td>'+fe(Math.round(T.ca*100)/100)+'</td><td>'+(eleTot!=null?fe(eleTot):'-')+'</td><td>'+fe(Math.round(T.ho*100)/100)+'</td></tr>';
+    h+='</tbody></table></div>';
+    h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportProductionCSV(\''+ym+'\',\'month\')">导出 CSV</button></div>';
+    document.getElementById('statsBody').innerHTML=h;return;
+  }
+  var months=monthsInPeriod(mode,ym).map(productionAggMonth),tIn=0,tOut=0,tCl=0,tCh=0,tCa=0,tPo=0,tHo=0;
+  months.forEach(function(r){tIn+=r.sumIn;tOut+=r.sumOut;tCl+=r.cl;tCh+=r.ch;tCa+=r.ca;if(r.po!=null)tPo+=r.po;tHo+=r.ho;});
+  var h2='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' 生产量报表（汇总）</h2>';
+  h2+='<div class="section-note">自动汇总：进水/出水取水量台账；加氯量=进水×7/1000；药剂=药剂台账当日求和；泥饼量=产泥台账板框+待机；脱泥机运行=产泥台账运行小时；用电量=电费台账当月总用电量。</div>';
+  h2+='<div class="tbwrap"><table class="tb"><thead><tr><th>月份</th><th>进水量合计(m³)</th><th>出水量合计(m³)</th><th>加氯量(kg)</th><th>药剂量(kg)</th><th>泥饼量(T)</th><th>用电量(度)</th><th>脱泥机运行(h)</th></tr></thead><tbody>';
+  months.forEach(function(r){h2+='<tr><td>'+r.y+'年'+r.m+'月</td><td>'+fe(r.sumIn)+'</td><td>'+fe(r.sumOut)+'</td><td>'+fe(r.cl)+'</td><td>'+fe(r.ch)+'</td><td>'+fe(r.ca)+'</td><td>'+(r.po!=null?fe(r.po):'-')+'</td><td>'+fe(r.ho)+'</td></tr>';});
+  h2+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(tIn)+'</td><td>'+fe(tOut)+'</td><td>'+fe(tCl)+'</td><td>'+fe(tCh)+'</td><td>'+fe(tCa)+'</td><td>'+(tPo?fe(Math.round(tPo*100)/100):'-')+'</td><td>'+fe(Math.round(tHo*100)/100)+'</td></tr>';
+  h2+='</tbody></table></div>';
+  h2+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportProductionCSV(\''+ym+'\',\''+mode+'\')">导出 CSV</button></div>';
+  document.getElementById('statsBody').innerHTML=h2;
+}
+function exportProductionCSV(ym,mode){
+  mode=mode||'month';
+  if(mode==='month'){
+    var y=+ym.slice(0,4),m=+ym.slice(5,7),dim=new Date(y,m,0).getDate();
+    var ele=DB.ledgers.electric.find(function(r){return (r.month||'').slice(0,7)===ym;});
+    var eleDay=ele?Math.round((num(ele.oldKwh)+num(ele.newKwh))/dim*100)/100:null;
+    var csv='﻿'+periodName(mode,ym)+' 生产量报表（自动汇总）\n日期,进水量(m³),出水量(m³),加氯量(kg),药剂量(kg),泥饼量(T),用电量(度/天),脱泥机运行(h)\n';
+    for(var d=1;d<=dim;d++){var ds=ym+'-'+String(d).padStart(2,'0');var w=DB.ledgers.water.find(function(r){return r.date===ds;});var chems=DB.ledgers.chemical.filter(function(r){return r.date===ds;});var sl=DB.ledgers.sludge.find(function(r){return r.date===ds;});var inQ=w?num(w.inflow):null,outQ=w?num(w.outflow):null,chemSum=0;chems.forEach(function(r){['pac','c10','salt','carbon','pam','fe','lime'].forEach(function(k){chemSum+=num(r[k]);});});var cake=sl?Math.round((num(sl.plate)+num(sl.standby))*1000)/1000:null,ho=sl?num(sl.hours):null,cl=inQ!=null?Math.round(inQ*7/1000*1000)/1000:null;csv+=d+'日,'+(inQ!=null?fmt(inQ):'')+','+(outQ!=null?fmt(outQ):'')+','+(cl!=null?fmt(cl):'')+','+(chemSum?fmt(Math.round(chemSum*100)/100):'')+','+(cake!=null?fmt(cake):'')+','+(eleDay!=null?fmt(eleDay):'')+','+(ho!=null?fmt(ho):'')+'\n';}
+    download(csv,'生产量报表_'+ym+'.csv','text/csv');return;
+  }
+  var months=monthsInPeriod(mode,ym).map(productionAggMonth),csv='﻿'+periodName(mode,ym)+' 生产量报表（汇总）\n月份,进水量合计(m³),出水量合计(m³),加氯量(kg),药剂量(kg),泥饼量(T),用电量(度),脱泥机运行(h)\n';
+  months.forEach(function(r){csv+=r.y+'年'+r.m+'月,'+fve(r.sumIn)+','+fve(r.sumOut)+','+fve(r.cl)+','+fve(r.ch)+','+fve(r.ca)+','+(r.po!=null?fve(r.po):'')+','+fve(r.ho)+'\n';});
+  download(csv,'生产量报表_'+periodSlug(mode,ym)+'.csv','text/csv');
+}
+function sludgeAggMonth(mo){
+  var dim=new Date(+mo.slice(0,4),+mo.slice(5,7),0).getDate(),T={p:0,s:0,t:0,tr:0,ho:0};
+  for(var d=1;d<=dim;d++){var ds=mo+'-'+String(d).padStart(2,'0');var sl=DB.ledgers.sludge.find(function(r){return r.date===ds;});var tr=DB.ledgers.transfer.filter(function(r){return r.date===ds;}).reduce(function(a,r){return a+num(r.net);},0);if(sl){T.p+=num(sl.plate);T.s+=num(sl.standby);T.ho+=num(sl.hours);}T.tr+=tr;}
+  return {m:+mo.slice(5,7),y:+mo.slice(0,4),p:Math.round(T.p*1000)/1000,s:Math.round(T.s*1000)/1000,t:Math.round((T.p+T.s)*1000)/1000,tr:Math.round(T.tr*1000)/1000,ho:Math.round(T.ho*100)/100};
+}
+function renderSludgeReport(ym,mode){
+  mode=mode||'month';
+  var h='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' 产泥报表</h2>';
+  h+='<div class="section-note">产泥量取自产泥台账（板框+待机）；污泥转运量自动按日从污泥转运台账净重合计（与减排汇总表口径一致）。</div>';
+  if(mode==='month'){
+    var y=+ym.slice(0,4),m=+ym.slice(5,7),dim=new Date(y,m,0).getDate(),rows=[],T={p:0,s:0,t:0,tr:0,ho:0},n=0;
+    for(var d=1;d<=dim;d++){var ds=ym+'-'+String(d).padStart(2,'0');var sl=DB.ledgers.sludge.find(function(r){return r.date===ds;});var tr=DB.ledgers.transfer.filter(function(r){return r.date===ds;}).reduce(function(a,r){return a+num(r.net);},0);var p=sl?num(sl.plate):null,s2=sl?num(sl.standby):null,tot=sl?Math.round((num(sl.plate)+num(sl.standby))*1000)/1000:null,ho=sl?num(sl.hours):null;if(p!=null)T.p+=p;if(s2!=null)T.s+=s2;if(tot!=null)T.t+=tot;if(tr)T.tr+=tr;if(ho!=null)T.ho+=ho;if(p!=null||s2!=null||tr||ho!=null)n++;rows.push({d:d,p:p,s:s2,tot:tot,tr:tr?Math.round(tr*1000)/1000:null,ho:ho});}
+    if(!n){h+='<div class="muted">该期间暂无数据，请先在「台账中心 → 产泥台账 / 污泥转运」录入。</div>';document.getElementById('statsBody').innerHTML=h;return;}
+    h+='<div class="tbwrap"><table class="tb"><thead><tr><th>日期</th><th>板框产泥量(T)</th><th>待机产泥量(T)</th><th>总泥饼量(T)</th><th>污泥转运量(T)</th><th>脱水机运行(h)</th></tr></thead><tbody>';
+    rows.forEach(function(r){h+='<tr><td>'+r.d+'日</td><td>'+fe(r.p)+'</td><td>'+fe(r.s)+'</td><td>'+fe(r.tot)+'</td><td>'+fe(r.tr)+'</td><td>'+fe(r.ho)+'</td></tr>';});
+    h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(Math.round(T.p*1000)/1000)+'</td><td>'+fe(Math.round(T.s*1000)/1000)+'</td><td>'+fe(Math.round(T.t*1000)/1000)+'</td><td>'+fe(Math.round(T.tr*1000)/1000)+'</td><td>'+fe(Math.round(T.ho*100)/100)+'</td></tr>';
+    h+='</tbody></table></div>';
+    h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportSludgeCSV(\''+ym+'\',\'month\')">导出 CSV</button></div>';
+    document.getElementById('statsBody').innerHTML=h;return;
+  }
+  var months=monthsInPeriod(mode,ym).map(sludgeAggMonth),tP=0,tS=0,tT=0,tTr=0,tHo=0;
+  months.forEach(function(r){tP+=r.p;tS+=r.s;tT+=r.t;tTr+=r.tr;tHo+=r.ho;});
+  var h2='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' 产泥报表（汇总）</h2>';
+  h2+='<div class="section-note">产泥量取自产泥台账；污泥转运量自动从污泥转运台账合计。</div>';
+  h2+='<div class="tbwrap"><table class="tb"><thead><tr><th>月份</th><th>板框产泥量(T)</th><th>待机产泥量(T)</th><th>总泥饼量(T)</th><th>污泥转运量(T)</th><th>脱水机运行(h)</th></tr></thead><tbody>';
+  months.forEach(function(r){h2+='<tr><td>'+r.y+'年'+r.m+'月</td><td>'+fe(r.p)+'</td><td>'+fe(r.s)+'</td><td>'+fe(r.t)+'</td><td>'+fe(r.tr)+'</td><td>'+fe(r.ho)+'</td></tr>';});
+  h2+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(Math.round(tP*1000)/1000)+'</td><td>'+fe(Math.round(tS*1000)/1000)+'</td><td>'+fe(Math.round(tT*1000)/1000)+'</td><td>'+fe(Math.round(tTr*1000)/1000)+'</td><td>'+fe(Math.round(tHo*100)/100)+'</td></tr>';
+  h2+='</tbody></table></div>';
+  h2+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportSludgeCSV(\''+ym+'\',\''+mode+'\')">导出 CSV</button></div>';
+  document.getElementById('statsBody').innerHTML=h2;
+}
+function exportSludgeCSV(ym,mode){
+  mode=mode||'month';
+  if(mode==='month'){
+    var y=+ym.slice(0,4),m=+ym.slice(5,7),dim=new Date(y,m,0).getDate();
+    var csv='﻿'+periodName(mode,ym)+' 产泥报表\n日期,板框产泥量(T),待机产泥量(T),总泥饼量(T),污泥转运量(T),脱水机运行(h)\n';
+    for(var d=1;d<=dim;d++){var ds=ym+'-'+String(d).padStart(2,'0');var sl=DB.ledgers.sludge.find(function(r){return r.date===ds;});var tr=DB.ledgers.transfer.filter(function(r){return r.date===ds;}).reduce(function(a,r){return a+num(r.net);},0);var p=sl?num(sl.plate):null,s2=sl?num(sl.standby):null,tot=sl?Math.round((num(sl.plate)+num(sl.standby))*1000)/1000:null,ho=sl?num(sl.hours):null;csv+=d+'日,'+(p!=null?fmt(p):'')+','+(s2!=null?fmt(s2):'')+','+(tot!=null?fmt(tot):'')+','+(tr?fmt(Math.round(tr*1000)/1000):'')+','+(ho!=null?fmt(ho):'')+'\n';}
+    download(csv,'产泥报表_'+ym+'.csv','text/csv');return;
+  }
+  var months=monthsInPeriod(mode,ym).map(sludgeAggMonth),csv='﻿'+periodName(mode,ym)+' 产泥报表（汇总）\n月份,板框产泥量(T),待机产泥量(T),总泥饼量(T),污泥转运量(T),脱水机运行(h)\n';
+  months.forEach(function(r){csv+=r.y+'年'+r.m+'月,'+fve(r.p)+','+fve(r.s)+','+fve(r.t)+','+fve(r.tr)+','+fve(r.ho)+'\n';});
+  download(csv,'产泥报表_'+periodSlug(mode,ym)+'.csv','text/csv');
+}
+function reductionAggMonth(mo){
+  var dim=new Date(+mo.slice(0,4),+mo.slice(5,7),0).getDate(),T={b:0,pu:0,de:0,dec:0};
+  for(var d=1;d<=dim;d++){var ds=mo+'-'+String(d).padStart(2,'0');var r=DB.ledgers.reduction.find(function(x){return x.date===ds;});var sl=DB.ledgers.sludge.find(function(x){return x.date===ds;});var b=r?num(r.blower):null,pu=r?num(r.pump):null,de=(r&&r.dewat!=null&&r.dewat!=='')?num(r.dewat):(sl?num(sl.hours):null),dec=r?num(r.decant):null;if(b!=null)T.b+=b;if(pu!=null)T.pu+=pu;if(de!=null)T.de+=de;if(dec!=null)T.dec+=dec;}
+  return {m:+mo.slice(5,7),y:+mo.slice(0,4),b:Math.round(T.b*10)/10,pu:Math.round(T.pu*10)/10,de:Math.round(T.de*10)/10,dec:Math.round(T.dec*10)/10};
+}
+function renderReductionReport(ym,mode){
+  mode=mode||'month';
+  var h='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' 减排（设备运行时间）报表</h2>';
+  h+='<div class="section-note">污泥脱水机运行时间自动取自产泥台账（脱水机运行h）。鼓风机/提升泵/滗水器运行时间需在「台账中心 → 减排运行台账」录入（目前无其它台账记录此类数据）。</div>';
+  if(mode==='month'){
+    var y=+ym.slice(0,4),m=+ym.slice(5,7),dim=new Date(y,m,0).getDate(),rows=[],T={b:0,pu:0,de:0,dec:0},n=0;
+    for(var d=1;d<=dim;d++){var ds=ym+'-'+String(d).padStart(2,'0');var r=DB.ledgers.reduction.find(function(x){return x.date===ds;});var sl=DB.ledgers.sludge.find(function(x){return x.date===ds;});var b=r?num(r.blower):null,pu=r?num(r.pump):null,de=(r&&r.dewat!=null&&r.dewat!=='')?num(r.dewat):(sl?num(sl.hours):null),dec=r?num(r.decant):null;if(b!=null)T.b+=b;if(pu!=null)T.pu+=pu;if(de!=null)T.de+=de;if(dec!=null)T.dec+=dec;if(b!=null||pu!=null||de!=null||dec!=null)n++;rows.push({d:d,b:b,pu:pu,de:de,dec:dec});}
+    if(!n){h+='<div class="muted">该期间暂无数据，请先在「台账中心 → 减排运行台账」录入设备运行时间。</div>';document.getElementById('statsBody').innerHTML=h;return;}
+    h+='<div class="tbwrap"><table class="tb"><thead><tr><th>日期</th><th>鼓风机(h)</th><th>提升泵(h)</th><th>污泥脱水机(h)</th><th>滗水器(h)</th></tr></thead><tbody>';
+    rows.forEach(function(r){h+='<tr><td>'+r.d+'日</td><td>'+fe(r.b)+'</td><td>'+fe(r.pu)+'</td><td>'+fe(r.de)+'</td><td>'+fe(r.dec)+'</td></tr>';});
+    h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(Math.round(T.b*10)/10)+'</td><td>'+fe(Math.round(T.pu*10)/10)+'</td><td>'+fe(Math.round(T.de*10)/10)+'</td><td>'+fe(Math.round(T.dec*10)/10)+'</td></tr>';
+    h+='</tbody></table></div>';
+    h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportReductionCSV(\''+ym+'\',\'month\')">导出 CSV</button></div>';
+    document.getElementById('statsBody').innerHTML=h;return;
+  }
+  var months=monthsInPeriod(mode,ym).map(reductionAggMonth),tB=0,tPu=0,tDe=0,tDec=0;
+  months.forEach(function(r){tB+=r.b;tPu+=r.pu;tDe+=r.de;tDec+=r.dec;});
+  var h2='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' 减排（设备运行时间）报表（汇总）</h2>';
+  h2+='<div class="section-note">污泥脱水机运行时间自动取自产泥台账。</div>';
+  h2+='<div class="tbwrap"><table class="tb"><thead><tr><th>月份</th><th>鼓风机(h)</th><th>提升泵(h)</th><th>污泥脱水机(h)</th><th>滗水器(h)</th></tr></thead><tbody>';
+  months.forEach(function(r){h2+='<tr><td>'+r.y+'年'+r.m+'月</td><td>'+fe(r.b)+'</td><td>'+fe(r.pu)+'</td><td>'+fe(r.de)+'</td><td>'+fe(r.dec)+'</td></tr>';});
+  h2+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(Math.round(tB*10)/10)+'</td><td>'+fe(Math.round(tPu*10)/10)+'</td><td>'+fe(Math.round(tDe*10)/10)+'</td><td>'+fe(Math.round(tDec*10)/10)+'</td></tr>';
+  h2+='</tbody></table></div>';
+  h2+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportReductionCSV(\''+ym+'\',\''+mode+'\')">导出 CSV</button></div>';
+  document.getElementById('statsBody').innerHTML=h2;
+}
+function exportReductionCSV(ym,mode){
+  mode=mode||'month';
+  if(mode==='month'){
+    var y=+ym.slice(0,4),m=+ym.slice(5,7),dim=new Date(y,m,0).getDate();
+    var csv='﻿'+periodName(mode,ym)+' 减排（设备运行时间）报表\n日期,鼓风机(h),提升泵(h),污泥脱水机(h),滗水器(h)\n';
+    for(var d=1;d<=dim;d++){var ds=ym+'-'+String(d).padStart(2,'0');var r=DB.ledgers.reduction.find(function(x){return x.date===ds;});var sl=DB.ledgers.sludge.find(function(x){return x.date===ds;});var b=r?num(r.blower):null,pu=r?num(r.pump):null,de=(r&&r.dewat!=null&&r.dewat!=='')?num(r.dewat):(sl?num(sl.hours):null),dec=r?num(r.decant):null;csv+=d+'日,'+(b!=null?fmt(b):'')+','+(pu!=null?fmt(pu):'')+','+(de!=null?fmt(de):'')+','+(dec!=null?fmt(dec):'')+'\n';}
+    download(csv,'减排运行报表_'+ym+'.csv','text/csv');return;
+  }
+  var months=monthsInPeriod(mode,ym).map(reductionAggMonth),csv='﻿'+periodName(mode,ym)+' 减排（设备运行时间）报表（汇总）\n月份,鼓风机(h),提升泵(h),污泥脱水机(h),滗水器(h)\n';
+  months.forEach(function(r){csv+=r.y+'年'+r.m+'月,'+fve(r.b)+','+fve(r.pu)+','+fve(r.de)+','+fve(r.dec)+'\n';});
+  download(csv,'减排运行报表_'+periodSlug(mode,ym)+'.csv','text/csv');
 }
 /* ================= 运行调度月报（自动生成） ================= */
 function renderSched(ym){
