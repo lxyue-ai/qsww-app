@@ -574,7 +574,7 @@ table.tb tbody tr:hover{background:var(--blue-xl)}
   <img id="ghqrimg" src="" alt="二维码" style="max-width:200px;border:1px solid var(--border);border-radius:8px;background:#fff" onerror="this.style.display='none';var u=document.getElementById('ghqrurl');if(u){u.style.display='block';u.textContent='（二维码加载失败，可手动复制地址：'+window.location.href+'）';}">
   <div id="ghqrurl" style="display:none;font-size:12px;color:var(--muted);margin-top:6px;word-break:break-all"></div>
 </div>
-<div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn ghost sm" onclick="closeGh()">关闭</button><button class="btn green sm" onclick="saveGhSettings()">保存并测试</button><button class="btn ghost sm" onclick="ghPull(false);toast('已手动同步')">立即同步</button><button class="btn ghost sm" style="color:var(--red);border-color:var(--red)" onclick="ghPushForce()">强制推送(本机→云端)</button></div>
+<div class="row" style="justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn ghost sm" onclick="closeGh()">关闭</button><button class="btn green sm" onclick="saveGhSettings()">保存并测试</button><button class="btn ghost sm" onclick="ghPull(false);toast('已手动同步')">立即同步</button><button class="btn ghost sm" style="color:var(--red);border-color:var(--red)" onclick="ghPushForce()">强制推送(本机→云端)</button><button class="btn ghost sm" style="color:var(--red);border-color:var(--red)" onclick="ghPullForce()">强制拉取(云端→本机)</button></div>
 </div></div></div>
 <div class="toast" id="toast"></div>
 
@@ -3133,6 +3133,26 @@ async function ghPull(first){
     if(remTs&&remTs<=localTs&&!first){ghStatus('ok');return;}
     mergeDB(remote);save(true);refreshAll();ghStatus('ok');
   }catch(e){console.warn('ghPull',e);ghStatus('err',e.message);throw e;}
+}
+async function ghPullForce(){
+  if(!ghEnabled()){toast('请先配置 GitHub 同步');return;}
+  if(!confirm('确定以云端数据强制覆盖本机？\n本机当前所有数据将被云端数据替换，未同步到云端的本地修改会丢失。'))return;
+  ghStatus('ing');
+  try{
+    var c=ghConf();
+    var url=ghBase()+(c.branch&&c.branch!=='main'?'?ref='+encodeURIComponent(c.branch):'');
+    var r=await fetch(url,{headers:ghHeaders()});
+    if(r.status===404){toast('云端暂无数据');ghStatus('ok');return;}
+    if(!r.ok){var e=await r.json().catch(function(){return {};});throw new Error(e.message||('HTTP '+r.status));}
+    var j=await r.json();
+    var remote=JSON.parse(b64dec(j.content));
+    /* 直接用云端数据替换本地，保留本地配置中的 GitHub 同步设置 */
+    var localGh=localStorage.getItem('wb_qsww_gh');
+    DB=remote;
+    if(localGh)localStorage.setItem('wb_qsww_gh',localGh);
+    migrate();save(true);refreshAll();ghStatus('ok');
+    toast('已强制拉取：本机数据已与云端一致');
+  }catch(e){console.warn('ghPullForce',e);ghStatus('err',e.message);toast('强制拉取失败：'+(e&&e.message||e));throw e;}
 }
 function ghStatus(state,msg){
   var b=document.getElementById('syncBtn');if(!b)return;
