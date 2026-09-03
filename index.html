@@ -1822,7 +1822,8 @@ function renderSludge(){
     renderGenericInto('sludge','sludgeSubBody',sludgePeriod);
   }else if(sludgeSub==='transfer'){
     h+=sludgePeriodBar();
-    h+='<div class="row" style="margin-bottom:12px"><button class="btn ghost" onclick="dedupeLedger(\'transfer\')"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg>去除重复转运记录</button><span class="muted">同一天「日期/净重/车牌/司机/备注」完全一致的重复行将被合并为一条，避免转运量重复计算；真实多车（任一字段不同）会保留。</span></div>';
+    h+='<div class="row" style="margin-bottom:12px;gap:10px;flex-wrap:wrap"><button class="btn ghost" onclick="dedupeLedger(\'transfer\')"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg>去除重复转运记录</button><button class="btn danger" onclick="clearTransferBoth()"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14"/></svg>清空本机+云端污泥转运</button></div>'
+    +'<div class="muted" style="margin-bottom:10px">「清空本机+云端污泥转运」会删除<b>本浏览器</b>和所有已同步设备上的全部转运记录，且不可恢复；仅当你想从零重新导入时使用。清空前建议先「导出备份」。</div>';
     document.getElementById('sludgeBody').innerHTML=h+'<div id="sludgeSubBody"></div>';
     renderGenericInto('transfer','sludgeSubBody',sludgePeriod);
   }else if(sludgeSub==='calc'){
@@ -1887,6 +1888,19 @@ function sludgeCalcByOutflow(){
   });
   save();renderSludge();
   toast('已按出水量比例分摊本月板框产泥量 '+fmt(plateTarget)+' T（总泥饼量 '+fmt(b.plate)+'T = 板框+待机）到 '+days.length+' 天（新建 '+added+' 天，其余已更新）');
+}
+function clearTransferBoth(){
+  if(!confirm('确定清空本机+云端全部污泥转运记录？\n本操作会删除本浏览器以及所有已同步设备上的转运数据，且无法撤销！\n建议先导出备份。'))return;
+  DB.ledgers.transfer=[];
+  DB.settings.sludgeBase=0;
+  DB.settings.updatedAt=Date.now();
+  save();
+  renderSludge();
+  if(ghEnabled()){
+    ghPushForce().then(function(){toast('已清空本机+云端污泥转运记录');}).catch(function(e){toast('本地已清空，但云端推送失败：'+(e&&e.message||e));});
+  }else{
+    toast('本地转运记录已清空（未配置 GitHub 同步，云端未受影响）');
+  }
 }
 function sludgeCalcAvg(){
   var ym=sludgeCalcYm||thisMonth();
