@@ -314,6 +314,7 @@
         <button class="btn" id="btnSave">💾 保存到台账</button>
         <button class="btn ghost" id="btnClear">清空表单</button>
         <button class="btn blue" id="btnPreview">👁 预览申报表</button>
+        <button class="btn sm green" id="btnImpExcelEntry" title="从《数据异常统计表》等 Excel 自动识别并入库">📥 上传表格自动录入</button>
       </div>
     </div>
   </section>
@@ -331,12 +332,14 @@
           <option>流量</option><option>污泥</option><option>其他</option>
         </select>
         <button class="btn sm gray" id="btnExpJson">导出备份JSON</button>
+        <button class="btn sm gray" id="btnExpExcel">导出Excel</button>
+        <button class="btn sm gray" id="btnDedup" title="删除完全重复记录，并把同一天的异常合并为单条">🔧 去重合并</button>
       </div>
       <div class="scroll-hint">表格较宽，可在下方区域左右滑动查看。</div>
       <div class="table-wrap"><table id="tbl">
         <thead><tr>
           <th>异常日期</th><th>污染物类别</th><th>异常现象</th><th>原因分析</th>
-          <th>生成上报表</th><th>盖章扫描件</th><th>其他相关附件</th><th>批复</th><th>备注</th><th class="noprint" style="min-width:120px">操作</th>
+          <th>盖章扫描件</th><th>其他相关附件</th><th>批复</th><th>备注</th><th class="noprint" style="min-width:120px">操作</th>
         </tr></thead>
         <tbody id="tblBody"></tbody>
       </table></div>
@@ -1047,7 +1050,7 @@ document.getElementById('btnSave').onclick=function(){
     folder:folder,report:pendingReportFiles.length?pendingReportFiles:[],att:pendingAttFiles.length?pendingAttFiles:[],sample:false});
   save(records);toast('已保存到台账');
   clearForm();
-  renderStat();
+  renderList();renderStat();
 };
 document.getElementById('btnPreview').onclick=function(){
   var f=readForm();
@@ -1072,7 +1075,6 @@ function renderList(){
       '<td data-label="污染物类别">'+catTagsHtml(r)+'</td>'+
       '<td data-label="异常现象">'+esc(r.phen)+(r.sample?' <span style="color:#bbb">[示例]</span>':'')+'</td>'+
       '<td data-label="原因分析">'+esc(r.cause)+'</td>'+
-      '<td data-label="生成上报表"><button class="btn sm rowbtn" onclick="openReportById(\''+r.id+'\')">生成申报表</button></td>'+
       '<td data-label="盖章扫描件">'+(fileCount(r.report)?renderFiles(r.report):'<span style="color:#bbb">未上传</span>')+'</td>'+
       '<td data-label="其他附件">'+renderFiles(r.att)+'</td>'+
       '<td data-label="是否批复">'+esc(r.approved||'')+'</td>'+
@@ -1082,7 +1084,8 @@ function renderList(){
   });
 }
 function opBtns(r){
-  return (r.folder?'<span class="btn sm gray rowbtn" style="color:#fff" data-path="'+esc(r.folder)+'" onclick="openLocalFile(this.getAttribute(\'data-path\'))">打开文件夹</span>':'')+
+  return '<button class="btn sm rowbtn" onclick="openReportById(\''+r.id+'\')">生成申报表</button>'+
+    (r.folder?'<span class="btn sm gray rowbtn" style="color:#fff" data-path="'+esc(r.folder)+'" onclick="openLocalFile(this.getAttribute(\'data-path\'))">打开文件夹</span>':'')+
     '<button class="btn sm rowbtn" onclick="editRec(\''+r.id+'\')">编辑</button>'+
     '<button class="btn sm ghost rowbtn" onclick="delRec(\''+r.id+'\')">删除</button>';
 }
@@ -1339,6 +1342,86 @@ function exportJson(){
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='异常申报台账备份_'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('已导出备份');
 }
+/* ===== 去重合并 / Excel 导出 / 表格自动录入 ===== */
+function _normCatSet(cat){
+  var set={};catArr({cat:cat}).forEach(function(c){var t=String(c).trim();if(t)set[t]=1;});return Object.keys(set).sort();
+}
+function _recKey(r){return r.date+'|'+_normCatSet(r.cat).join(',')+'|'+(r.phen||'').trim()+'|'+(r.cause||'').trim();}
+function _uniqFiles(arr){
+  var seen={}, out=[];
+  (arr||[]).forEach(function(f){
+    var k=(f&&f.name?f.name:'')+'|'+(f&&f.data?String(f.data).slice(0,80):'');
+    if(!seen[k]){seen[k]=1;out.push(f);}
+  });
+  return out;
+}
+function _cloneRec(r){
+  return {id:r.id, date:r.date, cat:_normCatSet(r.cat), site:r.site||'', phen:r.phen||'', cause:r.cause||'',
+    est:r.est||'', rep:r.rep||'', folder:r.folder||'',
+    report:Array.isArray(r.report)?r.report.slice():(r.report?[r.report]:[]),
+    att:Array.isArray(r.att)?r.att.slice():(r.att?[r.att]:[]),
+    approved:r.approved||'', note:r.note||'', sample:!!r.sample};
+}
+function _mergeRecs(a,b){
+  var cm={};_normCatSet(a.cat).forEach(function(c){cm[c]=1;});_normCatSet(b.cat).forEach(function(c){cm[c]=1;});
+  a.cat=Object.keys(cm).sort();
+  function joinDistinct(arr){
+    var s={};arr.forEach(function(p){String(p||'').split(/[；;]/).map(function(x){return x.trim();}).filter(function(x){return x;}).forEach(function(x){s[x]=1;});});
+    return Object.keys(s).join('；');
+  }
+  a.phen=joinDistinct([a.phen,b.phen]);
+  a.cause=joinDistinct([a.cause,b.cause]);
+  if(!a.site&&b.site)a.site=b.site;
+  if(!a.est&&b.est)a.est=b.est;
+  if(!a.rep&&b.rep)a.rep=b.rep;
+  if(!a.folder&&b.folder)a.folder=b.folder;
+  if(!a.approved&&b.approved)a.approved=b.approved;
+  a.note=joinDistinct([a.note,b.note]);
+  a.report=_uniqFiles(a.report.concat(b.report||[]));
+  a.att=_uniqFiles(a.att.concat(b.att||[]));
+  return a;
+}
+/* 完全重复(同日+同类别+同现象+同原因)→删除；同一天不同问题→合并为一条 */
+function consolidate(list){
+  var dup=0, step=[], seen={};
+  list.forEach(function(r){
+    var k=_recKey(r);
+    if(seen[k]){dup++;return;}
+    seen[k]=1; step.push(_cloneRec(r));
+  });
+  var byDay={}, out=[], mg=0;
+  step.forEach(function(r){
+    if(byDay[r.date]){_mergeRecs(byDay[r.date],r);mg++;}else{byDay[r.date]=r;out.push(r);}
+  });
+  return {records:out, dupCount:dup, mergeCount:mg};
+}
+function dedupMergeAction(){
+  if(!records.length){toast('台账为空');return;}
+  var c=consolidate(records);
+  var changed=records.length-c.records.length;
+  if(!changed){toast('没有重复或需合并的记录');return;}
+  if(!confirm('将删除 '+c.dupCount+' 条完全重复记录，并把 '+c.mergeCount+' 组同一天的异常合并为单条。\n当前 '+records.length+' 条 → 整理后 '+c.records.length+' 条。确定执行？'))return;
+  records=c.records; save(records);
+  toast('已整理，剩余 '+records.length+' 条'); renderList(); renderStat();
+}
+function exportExcel(){
+  if(typeof XLSX==='undefined'){toast('Excel 库加载中，请稍后再试');return;}
+  if(!records.length){toast('暂无记录可导出');return;}
+  var rows=records.slice().sort(function(a,b){return a.date<b.date?1:-1;}).map(function(r){
+    return {'异常日期':r.date,'污染物类别':catArr(r).join('、'),'自动监控现场端名称':r.site||'',
+      '异常现象':r.phen||'','原因分析':r.cause||'','预计恢复时间':r.est||'','填表人/运维':r.rep||'',
+      '是否批复':r.approved||'','备注':r.note||'','关联文件夹':r.folder||'',
+      '盖章扫描件数':fileCount(r.report),'其他附件数':fileCount(r.att)};
+  });
+  var ws=XLSX.utils.json_to_sheet(rows);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '异常申报台账');
+  XLSX.writeFile(wb, '异常申报台账_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('已导出 Excel');
+}
+document.getElementById('btnExpExcel').onclick=exportExcel;
+document.getElementById('btnDedup').onclick=dedupMergeAction;
+document.getElementById('btnImpExcelEntry').onclick=function(){document.getElementById('excelFile').click();};
 document.getElementById('btnImp').onclick=function(){document.getElementById('impFile').click();};
 document.getElementById('impFile').addEventListener('change',function(e){
   var f=e.target.files[0];if(!f)return;var rd=new FileReader();
@@ -1538,15 +1621,22 @@ document.getElementById('btnCancelExcel').onclick=function(){
 document.getElementById('btnConfirmExcel').onclick=function(){
   if(!excelParsed.length){toast('没有可导入的数据');return;}
   var mode=document.getElementById('impMode').value;
+  var c;
   if(mode==='overwrite'){
     if(!confirm('覆盖模式将清空现有 '+records.length+' 条记录，确定？'))return;
-    records=excelParsed;
+    c=consolidate(excelParsed);
+    records=c.records;
+    toast('已导入（去重 '+c.dupCount+' 条 / 合并同日 '+c.mergeCount+' 组）');
   }else{
-    records=records.concat(excelParsed);
+    // 追加：与现有台账按同一天自动合并、并去除完全重复
+    c=consolidate(records.concat(excelParsed));
+    var before=records.length+excelParsed.length;
+    records=c.records;
+    toast('已追加并去重合并（共精简 '+(before-records.length)+' 条）');
   }
-  save(records);toast('成功导入 '+excelParsed.length+' 条异常记录');
+  save(records);
   excelParsed=[];excelRaw=[];document.getElementById('excelPreview').style.display='none';
-  showTab('list');
+  showTab('list');renderList();renderStat();
 };
 
 /* 内嵌模式：被工作台 iframe 嵌入时隐藏自带页头，保留顶部导航 */
