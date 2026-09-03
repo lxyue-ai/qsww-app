@@ -691,7 +691,7 @@ var KEY='qsww_abn_ledger_v1', SETKEY='qsww_abn_settings';
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||[];}catch(e){return [];}}
 function save(d){
   try{
-    if(Array.isArray(d))d=consolidate(d).records;
+    if(Array.isArray(d))d=dedupOnly(d);
     localStorage.setItem(KEY,JSON.stringify(d));abnGhSchedulePush();
   }
   catch(e){toast('保存失败：存储空间不足，请减少附件数量或图片大小后重试');}
@@ -724,7 +724,7 @@ function migratePaths(){
   });
   if(changed)save(records);
 }
-var records=consolidate(load()).records;
+var records=dedupOnly(load());
 var settings=loadSet();
 if(!settings.baseFolder)settings.baseFolder='E:\\工作台\\3、异常申报';
 if(!localStorage.getItem(KEY)){
@@ -781,8 +781,9 @@ function abnMerge(remote){
   if(!remote||typeof remote!=='object')return;
   if(Array.isArray(remote.records)){var m={};records.forEach(function(r){if(r&&r.id)m[r.id]=r;});remote.records.forEach(function(r){if(r&&r.id)m[r.id]=r;});records=Object.keys(m).map(function(id){return m[id];});}
   if(Array.isArray(remote.ov_records)){var om={};ov_records.forEach(function(r){if(r&&r.id)om[r.id]=r;});remote.ov_records.forEach(function(r){if(r&&r.id)om[r.id]=r;});ov_records=Object.keys(om).map(function(id){return om[id];});}
-  // 同步即归一化：异常申报去重+同日合并；溢流仅去重。确保任何设备推回的旧数据都不会让重复/拆分记录回流
-  records=consolidate(records).records;
+  // 同步即归一化：异常申报仅按"内容完全相同"去重（防止多设备旧数据回流造成重复）；
+  // 同日合并不再自动执行（改由台账明细的「🔧 去重合并」手动触发），以免新录入的同日异常被吞掉。
+  records=dedupOnly(records);
   ov_records=abnDedupOv(ov_records);
   save(records);ov_save();
 }
@@ -1483,7 +1484,19 @@ function _mergeRecs(a,b){
   a.att=_uniqFiles(a.att.concat(b.att||[]));
   return a;
 }
-/* 完全重复(同日+同类别+同现象+同原因)→删除；同一天不同问题→合并为一条 */
+/* 仅去重：内容完全相同(同日+同类别+同现象+同原因)的记录只保留一条。用于保存/加载/同步，
+   防止多设备旧数据回流造成重复，但不对"同日不同问题"做合并（合并留给手动「去重合并」）。 */
+function dedupOnly(list){
+  var seen={}, out=[];
+  (list||[]).forEach(function(r){
+    if(!r)return;
+    if(!r.id){out.push(r);return;}
+    var k=_recKey(r);
+    if(seen[k])return; seen[k]=1; out.push(r);
+  });
+  return out;
+}
+/* 完全重复(同日+同类别+同现象+同原因)→删除；同一天不同问题→合并为一条（手动触发用） */
 function consolidate(list){
   var dup=0, step=[], seen={};
   list.forEach(function(r){
