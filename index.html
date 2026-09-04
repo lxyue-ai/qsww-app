@@ -592,6 +592,7 @@ function migrate(){
   for(var k in LEDGERS)if(!LEDGERS[k].hidden&&!LEDGERS[k].computed&&!DB.ledgers[k])DB.ledgers[k]=[];
   if(!DB.monitor)DB.monitor={};
   if(!DB.settings)DB.settings={sludgeBase:0,updatedAt:0};
+  if(!DB.tomb||typeof DB.tomb!=='object')DB.tomb={}; /* 删除墓碑：记录被删/清空的记录 id，同步时阻止旧数据回流 */
   if(DB.settings.sludgeOpen){delete DB.settings.sludgeOpen;}  /* 期初改为严格按上月末剩余自动算，不再使用手动登记 */
   if(DB.settings.updatedAt==null)DB.settings.updatedAt=0;
   if(DB.files==null)DB.files=[];
@@ -1651,10 +1652,10 @@ function addLedgerRow(cat){
   if(cat==='transfer'&&r.net===''){toast('请填写净重');return;}
   if(curEdit.cat===cat&&curEdit.id){
     var ex=DB.ledgers[cat].find(function(x){return x.id===curEdit.id;});
-    if(ex){cfg.fields.forEach(function(f){if(f.k!=='id')ex[f.k]=r[f.k];});}
+    if(ex){cfg.fields.forEach(function(f){if(f.k!=='id')ex[f.k]=r[f.k];});ex.updatedAt=Date.now();}
     curEdit={cat:null,id:null};save();renderLedger();renderToday();renderSludge();toast('已修改');return;
   }
-  r.id=uid();
+  r.id=uid();r.updatedAt=Date.now();
   DB.ledgers[cat].push(r);save();renderLedger();renderToday();renderSludge();toast('已添加');
 }
 function calcNet(cat){
@@ -1677,6 +1678,8 @@ function ledgerEdit(cat,id){
 }
 function cancelLedgerEdit(){curEdit={cat:null,id:null};if(sludgeSub==='transfer'||sludgeSub==='prod')renderSludge();else renderLedger();toast('已取消编辑');}
 function delLedgerRow(cat,id){
+  /* 写墓碑：该 id 任何旧版本（含其他设备缓存的）同步拉取时都会被忽略，避免删掉的数据回流 */
+  DB.tomb=DB.tomb||{};DB.tomb[cat]=DB.tomb[cat]||{};DB.tomb[cat][id]=Date.now();
   DB.ledgers[cat]=DB.ledgers[cat].filter(function(x){return x.id!==id;});
   if(curEdit.cat===cat&&curEdit.id===id)curEdit={cat:null,id:null};
   save();renderLedger();renderToday();renderSludge();toast('已删除');
@@ -1891,13 +1894,16 @@ function sludgeCalcByOutflow(){
 }
 function clearTransferBoth(){
   if(!confirm('确定清空本机+云端全部污泥转运记录？\n本操作会删除本浏览器以及所有已同步设备上的转运数据，且无法撤销！\n建议先导出备份。'))return;
+  /* 先把被清掉的记录 id 全部写进墓碑：云端及其他设备拉取后会同步丢弃这些旧记录，彻底杜绝"清完又被推回来" */
+  DB.tomb=DB.tomb||{};DB.tomb.transfer=DB.tomb.transfer||{};
+  (DB.ledgers.transfer||[]).forEach(function(r){if(r&&r.id)DB.tomb.transfer[r.id]=Date.now();});
   DB.ledgers.transfer=[];
   DB.settings.sludgeBase=0;
   DB.settings.updatedAt=Date.now();
   save();
   renderSludge();
   if(ghEnabled()){
-    ghPushForce().then(function(){toast('已清空本机+云端污泥转运记录');}).catch(function(e){toast('本地已清空，但云端推送失败：'+(e&&e.message||e));});
+    ghPushForce().then(function(){toast('已清空本机+云端污泥转运记录（含墓碑，其他设备同步后将一并丢弃旧记录）');}).catch(function(e){toast('本地已清空，但云端推送失败：'+(e&&e.message||e));});
   }else{
     toast('本地转运记录已清空（未配置 GitHub 同步，云端未受影响）');
   }
@@ -1917,7 +1923,7 @@ function sludgeCalcAvg(){
     var ds=ym+'-'+('0'+d).slice(-2);
     if(ds>todayStr())break;
     var rec=DB.ledgers.sludge.find(function(r){return r.date===ds;});
-    if(!rec){rec={id:uid(),date:ds,plate:'',standby:'',hours:'',dest:''};DB.ledgers.sludge.push(rec);added++;}
+    if(!rec){rec={id:uid(),date:ds,plate:'',standby:'',hours:'',dest:''};rec.updatedAt=Date.now();DB.ledgers.sludge.push(rec);added++;}
     rec.plate=avg;
   }
   save();renderSludge();
@@ -3005,7 +3011,7 @@ function doImport2026(){
   var m=IMPORT2026,added=0;
   function merge(cat,rows,dk){
     rows.forEach(function(r){
-      if(!DB.ledgers[cat].some(function(x){return x[dk]===r[dk];})){var c={id:uid()};for(var k in r)c[k]=r[k];DB.ledgers[cat].push(c);added++;}
+      if(!DB.ledgers[cat].some(function(x){return x[dk]===r[dk];})){var c={id:uid()};for(var k in r)c[k]=r[k];c.updatedAt=Date.now();DB.ledgers[cat].push(c);added++;}
     });
   }
   merge('water',m.water,'date');
@@ -3063,22 +3069,11 @@ function buildSyncPayload(){
 }
 function natKeyOf(lk,r){
   if(!r||typeof r!=='object')return null;
-  if(lk==='transfer'){
-    /* 污泥转运：同一天可能多车。按"车次标识"=日期+车牌+运输人 作为自然键。
-       净重(net)/备注(note)是常改字段，绝不能进键，否则改值会生成重复记录。
-       同物理车次在任意设备录入都得到同一键 → 多设备同步自动去重、不重复；
-       同一天不同车次（车牌/运输人不同）→ 各自保留。车牌/运输人全为空时退回 id，避免同日误合并丢数据。 */
-    var tk=[(r.plate!=null?String(r.plate):''),(r.driver!=null?String(r.driver):'')].filter(function(x){return x;}).join('|');
-    if(r.date&&tk)return 'd:'+r.date+':'+tk;
-    return null;
-  }
-  if(lk==='sludge'){
-    /* 产泥记录：同一天多条。按 日期+板框产泥+待机产泥+运行小时 作为自然键（去向dest为自由文本不进键）。
-       同物理记录多设备录入得到同一键 → 自动去重；同日不同记录各自保留。字段全空时退回 id。 */
-    var sk=[(r.plate!=null?String(r.plate):''),(r.standby!=null?String(r.standby):''),(r.hours!=null?String(r.hours):'')].filter(function(x){return x;}).join('|');
-    if(r.date&&sk)return 'd:'+r.date+':'+sk;
-    return null;
-  }
+  /* 转运/产泥：同一天可有多车/多条，绝不按日期压缩！
+     统一按记录自身 id 合并（union）——同日多记录全部保留，彻底避免"同步后同一天只留一条"导致数据丢失。
+     同 id（同一条记录在多设备各自编辑）→ 自动合并；不同 id（同日不同车）→ 各自保留、互不删除。
+     净重/车牌/备注等常改字段一律不进键，改值不会产生重复。 */
+  if(lk==='transfer'||lk==='sludge')return null;
   if(lk==='reductionSum'||lk==='chemStock'){if(r.month)return 'm:'+r.month;}
   if(lk==='electric'){if(r.year&&r.month)return 'ym:'+r.year+'-'+r.month;}
   if(r.date)return 'd:'+r.date; /* 其余台账（水量/生产/药剂等）一天一条 */
@@ -3086,12 +3081,33 @@ function natKeyOf(lk,r){
 }
 function mergeDB(remote){
   if(!remote||typeof remote!=='object')return;
+  /* 合并删除墓碑（取各 id 较大时间戳），让"清空/删除"动作能在多设备间传播，旧数据不再回流 */
+  if(remote.tomb&&typeof remote.tomb==='object'){
+    DB.tomb=DB.tomb||{};
+    for(var _tk in remote.tomb){DB.tomb[_tk]=DB.tomb[_tk]||{};for(var _id in remote.tomb[_tk]){if(!(_id in DB.tomb[_tk])||remote.tomb[_tk][_id]>DB.tomb[_tk][_id])DB.tomb[_tk][_id]=remote.tomb[_tk][_id];}}
+  }
   if(remote.ledgers)for(var lk in remote.ledgers){
     var inc=remote.ledgers[lk]||[],loc=DB.ledgers[lk]||[],map={};
     function key(r){var nk=natKeyOf(lk,r);return nk?nk:(r&&r.id?('id:'+r.id):null);}
     loc.forEach(function(r){if(r){var k=key(r);if(k)map[k]=r;}});
-    inc.forEach(function(r){if(r){var k=key(r);if(k){if(map[k]){var m=Object.assign({},r);if(r.img==null&&map[k].img!=null)m.img=map[k].img;map[k]=m;}else map[k]=r;}}});
+    inc.forEach(function(r){
+      if(!r)return;
+      /* 本端已删除（墓碑）的远程记录：仅当远端版本比删除时间更新才允许"复活"（支持误删后重新录入同 id），否则忽略，杜绝旧数据被同步回来 */
+      if(DB.tomb&&DB.tomb[lk]&&r.id&&DB.tomb[lk][r.id]&&(r.updatedAt||0)<=DB.tomb[lk][r.id])return;
+      var k=key(r);
+      if(k){
+        if(map[k]){
+          var ex=map[k],ik=(r.updatedAt||0),ek=(ex.updatedAt||0),chosen=(ik>=ek)?r:ex;
+          var m=Object.assign({},chosen);
+          if(r.img==null&&ex.img!=null)m.img=ex.img;
+          if(ex.img==null&&r.img!=null)m.img=r.img;
+          map[k]=m;
+        }else map[k]=r;
+      }
+    });
     DB.ledgers[lk]=Object.keys(map).map(function(k){return map[k];});
+    /* 合并后再按墓碑过滤：本端遗留的、以及其他设备推回的旧记录（updatedAt 不晚于墓碑时间）一律丢弃，确保"清空/删除"在所有设备彻底生效 */
+    if(DB.tomb&&DB.tomb[lk]){DB.ledgers[lk]=DB.ledgers[lk].filter(function(r){return !(r&&r.id&&DB.tomb[lk][r.id]&&(r.updatedAt||0)<=DB.tomb[lk][r.id]);});}
   }
   if(Array.isArray(remote.reports)){var rm={};DB.reports.forEach(function(r){if(r&&r.id)rm[r.id]=r;});remote.reports.forEach(function(r){if(r&&r.id)rm[r.id]=r;});DB.reports=Object.keys(rm).map(function(id){return rm[id];});}
   if(Array.isArray(remote.files)){var fm={};DB.files.forEach(function(r){if(r&&r.id)fm[r.id]=r;});remote.files.forEach(function(r){if(r&&r.id){var x=Object.assign({},r);if(x.data==null&&fm[r.id]&&fm[r.id].data!=null)x.data=fm[r.id].data;fm[r.id]=x;}});DB.files=Object.keys(fm).map(function(id){return fm[id];});}
@@ -3434,7 +3450,7 @@ function mergeImport(cat,recs){
       if(!rec[keyF])return;
       var ex=dbE[rec[keyF]];
       if(ex){for(var f in rec){if(rec[f]!=null&&rec[f]!=='')ex[f]=rec[f];}updated++;}
-      else{rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);arr.push(rec);dbE[rec[keyF]]=rec;added++;}
+      else{rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);rec.updatedAt=Date.now();arr.push(rec);dbE[rec[keyF]]=rec;added++;}
     });
     return {added:added,updated:updated,ignored:0};
   }
@@ -3445,7 +3461,7 @@ function mergeImport(cat,recs){
     var k=rec[keyF];
     /* 同一批导入内出现重复日期（如一天多车转运）：不覆盖、不忽略，作为独立记录新增，保证转运量被正确累加 */
     if(batchAdded[k]){
-      rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);
+      rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);rec.updatedAt=Date.now();
       arr.push(rec); added++; return;
     }
     var ex=dbExist[k];
@@ -3454,10 +3470,10 @@ function mergeImport(cat,recs){
       var same=true;
       for(var f in rec){ if(rec[f]!=null&&rec[f]!==''){ if(ex[f]!==rec[f]){same=false;break;} } }
       if(same){ignored++; return;}
-      rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);
+      rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);rec.updatedAt=Date.now();
       arr.push(rec); added++; batchAdded[k]=true; return;
     }
-    rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);
+    rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);rec.updatedAt=Date.now();
     arr.push(rec); added++; batchAdded[k]=true;
   });
   return {added:added,updated:0,ignored:ignored};
