@@ -3063,21 +3063,25 @@ function buildSyncPayload(){
 }
 function natKeyOf(lk,r){
   if(!r||typeof r!=='object')return null;
-  if(r.date)return 'd:'+r.date;
-  if(lk==='reductionSum'||lk==='chemStock'){if(r.month)return 'm:'+r.month;}
-  if(lk==='electric'){if(r.year&&r.month)return 'ym:'+r.year+'-'+r.month;}
   if(lk==='transfer'){
-    /* 污泥转运：同一天可能多车，按业务字段整体作为自然键；内容完全相同才会合并 */
-    var parts=[];
-    ['net','plate','driver','note'].forEach(function(k){parts.push((r[k]!=null?String(r[k]):''));});
-    if(r.date)return 'd:'+r.date+':'+parts.join('|');
+    /* 污泥转运：同一天可能多车。按"车次标识"=日期+车牌+运输人 作为自然键。
+       净重(net)/备注(note)是常改字段，绝不能进键，否则改值会生成重复记录。
+       同物理车次在任意设备录入都得到同一键 → 多设备同步自动去重、不重复；
+       同一天不同车次（车牌/运输人不同）→ 各自保留。车牌/运输人全为空时退回 id，避免同日误合并丢数据。 */
+    var tk=[(r.plate!=null?String(r.plate):''),(r.driver!=null?String(r.driver):'')].filter(function(x){return x;}).join('|');
+    if(r.date&&tk)return 'd:'+r.date+':'+tk;
+    return null;
   }
   if(lk==='sludge'){
-    /* 产泥记录：同一天多条，按业务字段整体作为自然键 */
-    var parts=[];
-    ['plate','standby','hours','dest'].forEach(function(k){parts.push((r[k]!=null?String(r[k]):''));});
-    if(r.date)return 'd:'+r.date+':'+parts.join('|');
+    /* 产泥记录：同一天多条。按 日期+板框产泥+待机产泥+运行小时 作为自然键（去向dest为自由文本不进键）。
+       同物理记录多设备录入得到同一键 → 自动去重；同日不同记录各自保留。字段全空时退回 id。 */
+    var sk=[(r.plate!=null?String(r.plate):''),(r.standby!=null?String(r.standby):''),(r.hours!=null?String(r.hours):'')].filter(function(x){return x;}).join('|');
+    if(r.date&&sk)return 'd:'+r.date+':'+sk;
+    return null;
   }
+  if(lk==='reductionSum'||lk==='chemStock'){if(r.month)return 'm:'+r.month;}
+  if(lk==='electric'){if(r.year&&r.month)return 'ym:'+r.year+'-'+r.month;}
+  if(r.date)return 'd:'+r.date; /* 其余台账（水量/生产/药剂等）一天一条 */
   return null;
 }
 function mergeDB(remote){
