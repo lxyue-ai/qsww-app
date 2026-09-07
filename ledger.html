@@ -860,15 +860,25 @@ function abnMerge(remote){
   ov_records=abnDedupOv(ov_records);
   save(records);ov_save();
 }
-async function abnGhPush(isRetry){
+function abnGhGetUrl(c,extra){
+  var u=abnGhBase();
+  var q=[];
+  if(c.branch&&c.branch!=='main')q.push('ref='+encodeURIComponent(c.branch));
+  if(extra)q.push(extra);
+  return q.length?u+'?'+q.join('&'):u;
+}
+async function abnGhPush(isRetry,attempt){
   if(!abnGhEnabled())return;
-  if(__abn_syncing){if(!isRetry){setTimeout(function(){abnGhPush(true);},1000);}return;}
+  attempt=attempt||0;
+  var maxAttempts=3;
+  if(__abn_syncing){if(!isRetry){setTimeout(function(){abnGhPush(true,1);},500);}return;}
   __abn_syncing=true;
   abnSyncUI('ing');
   try{
     var c=abnGhConf(),sha=null,remote=null;
     try{
-      var g=await fetch(abnGhBase()+(c.branch&&c.branch!=='main'?'?ref='+encodeURIComponent(c.branch):''),{headers:abnGhHeaders(),cache:'no-store'});
+      var cb='cb='+Date.now()+'_'+Math.random().toString(36).slice(2);
+      var g=await fetch(abnGhGetUrl(c,cb),{headers:abnGhHeaders(),cache:'no-store'});
       if(g.ok){var j=await g.json();sha=j.sha;try{remote=JSON.parse(abnB64dec(j.content));}catch(e){}}
     }catch(e){}
     if(remote)abnMerge(remote);
@@ -879,9 +889,12 @@ async function abnGhPush(isRetry){
     var r=await fetch(abnGhBase(),{method:'PUT',headers:Object.assign({},abnGhHeaders(),{'Content-Type':'application/json'}),body:JSON.stringify(body)});
     if(!r.ok){
       var e=await r.json().catch(function(){return {};});
-      if(!isRetry && e && e.message && e.message.indexOf('does not match')>-1){
+      if(attempt<maxAttempts && e && e.message && e.message.indexOf('does not match')>-1){
         __abn_syncing=false;
-        return abnGhPush(true);
+        var delay=300*Math.pow(3,attempt); // 300,900,2700
+        if(attempt===0)toast('检测到云端有更新，正在自动重试同步…');
+        setTimeout(function(){abnGhPush(true,attempt+1);},delay);
+        return;
       }
       throw new Error(e.message||('HTTP '+r.status));
     }
@@ -896,8 +909,8 @@ async function abnGhPull(){
   abnSyncUI('ing');
   try{
     var c=abnGhConf();
-    var url=abnGhBase()+(c.branch&&c.branch!=='main'?'?ref='+encodeURIComponent(c.branch):'');
-    var r=await fetch(url,{headers:abnGhHeaders(),cache:'no-store'});
+    var cb='cb='+Date.now()+'_'+Math.random().toString(36).slice(2);
+    var r=await fetch(abnGhGetUrl(c,cb),{headers:abnGhHeaders(),cache:'no-store'});
     if(r.status===404){abnSyncUI('ok');return;}
     if(!r.ok){var e=await r.json().catch(function(){return {};});throw new Error(e.message||('HTTP '+r.status));}
     var j=await r.json();
