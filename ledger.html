@@ -717,6 +717,22 @@ var OV_DOC_TPL_BASE64="UEsDBBQAAAAIAAWDGF2tUqWRlQEAAMoGAAATAAAAW0NvbnRlbnRfVHlwZ
 <script>
 /* ============ 存储 ============ */
 var KEY='qsww_abn_ledger_v1', SETKEY='qsww_abn_settings';
+/* ===== 删除墓碑：记录"已删除"的 id，防止其它设备/旧缓存把删掉的记录同步回来 ===== */
+var TOMBKEY='qsww_abn_tomb_v1';
+var tomb={abn:{},ov:{}};
+try{var _t=JSON.parse(localStorage.getItem(TOMBKEY)||'null');if(_t&&typeof _t==='object'){tomb.abn=_t.abn||{};tomb.ov=_t.ov||{};}}catch(e){}
+function saveTomb(){try{localStorage.setItem(TOMBKEY,JSON.stringify(tomb));}catch(e){}}
+function markDeleted(kind,id){if(!id)return;if(!tomb[kind])tomb[kind]={};tomb[kind][id]=Date.now();saveTomb();}
+/* 批量：把「整理/导入后被清掉的」记录写入墓碑，避免它们被同步拉回来 */
+function markRemovedBatch(kind,beforeArr,afterArr){
+  var kept={};(afterArr||[]).forEach(function(r){if(r&&r.id)kept[r.id]=1;});
+  var n=0;(beforeArr||[]).forEach(function(r){if(r&&r.id&&!kept[r.id]){markDeleted(kind,r.id);n++;}});
+  return n;
+}
+function abnApplyTomb(){
+  if(tomb.abn){var a=records.filter(function(r){return !(r&&r.id&&tomb.abn[r.id]);});if(a.length!==records.length)records=a;}
+  if(tomb.ov){var b=ov_records.filter(function(r){return !(r&&r.id&&tomb.ov[r.id]);});if(b.length!==ov_records.length)ov_records=b;}
+}
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||[];}catch(e){return [];}}
 function save(d){
   try{
@@ -778,6 +794,8 @@ var OV_KEY='qsww_overflow_v1';
 var ov_records=[];
 try{ov_records=JSON.parse(localStorage.getItem(OV_KEY)||'[]');}catch(e){}
 ov_records=abnDedupOv(ov_records);
+/* 打开页面即按墓碑清理本机残留的已删记录（防止又被推回云端） */
+abnApplyTomb();
 function ov_save(){
   try{ov_records=abnDedupOv(ov_records);localStorage.setItem(OV_KEY,JSON.stringify(ov_records));abnGhSchedulePush();}
   catch(e){toast('保存失败：存储空间不足，请减少附件数量或图片大小后重试');}
@@ -794,7 +812,7 @@ function abnGhBase(){var c=abnGhConf();return 'https://api.github.com/repos/'+en
 function abnGhHeaders(){var c=abnGhConf();return {'Accept':'application/vnd.github+json','Authorization':'Bearer '+c.token,'X-GitHub-Api-Version':'2022-11-28'};}
 function abnB64enc(s){return btoa(unescape(encodeURIComponent(s)));}
 function abnB64dec(s){return decodeURIComponent(escape(atob(s.replace(/\s/g,''))));}
-function abnBuildPayload(){return {records:records,ov_records:ov_records,meta:{updatedAt:Date.now()}};}
+function abnBuildPayload(){return {records:records,ov_records:ov_records,tomb:tomb,meta:{updatedAt:Date.now()}};}
 /* 溢流记录按"定义字段"去重（不按日合并，溢流每天可能多起独立事件） */
 function abnDedupOv(arr){
   if(!Array.isArray(arr))return arr;
@@ -808,8 +826,34 @@ function abnDedupOv(arr){
 }
 function abnMerge(remote){
   if(!remote||typeof remote!=='object')return;
-  if(Array.isArray(remote.records)){var m={};records.forEach(function(r){if(r&&r.id)m[r.id]=r;});remote.records.forEach(function(r){if(r&&r.id)m[r.id]=r;});records=Object.keys(m).map(function(id){return m[id];});}
-  if(Array.isArray(remote.ov_records)){var om={};ov_records.forEach(function(r){if(r&&r.id)om[r.id]=r;});remote.ov_records.forEach(function(r){if(r&&r.id)om[r.id]=r;});ov_records=Object.keys(om).map(function(id){return om[id];});}
+  /* 1) 先合并墓碑：任一端删过就传播到两端（取较晚时间），删除优先级最高 */
+  if(remote.tomb&&typeof remote.tomb==='object'){
+    ['abn','ov'].forEach(function(k){
+      var rt=remote.tomb[k]||{};
+      if(!tomb[k])tomb[k]={};
+      for(var id in rt){if(!Object.prototype.hasOwnProperty.call(rt,id))continue;
+        var ts=rt[id];
+        /* 已恢复过备份则忽略更早的墓碑，避免刚恢复的记录被删掉 */
+        if(k==='abn'&&tomb.abnClearedAt&&ts<tomb.abnClearedAt)continue;
+        if(!tomb[k][id]||ts>tomb[k][id])tomb[k][id]=ts;}
+    });
+    saveTomb();
+  }
+  /* 2) 合并记录：跳过已删除（墓碑中）的 id，云端的旧记录不会再回流 */
+  if(Array.isArray(remote.records)){
+    var m={};
+    records.forEach(function(r){if(r&&r.id&&!(tomb.abn&&tomb.abn[r.id]))m[r.id]=r;});
+    remote.records.forEach(function(r){if(r&&r.id&&!(tomb.abn&&tomb.abn[r.id]))m[r.id]=r;});
+    records=Object.keys(m).map(function(id){return m[id];});
+  }
+  if(Array.isArray(remote.ov_records)){
+    var om={};
+    ov_records.forEach(function(r){if(r&&r.id&&!(tomb.ov&&tomb.ov[r.id]))om[r.id]=r;});
+    remote.ov_records.forEach(function(r){if(r&&r.id&&!(tomb.ov&&tomb.ov[r.id]))om[r.id]=r;});
+    ov_records=Object.keys(om).map(function(id){return om[id];});
+  }
+  /* 3) 本机残留的已删记录也一并清掉 */
+  abnApplyTomb();
   // 同步即归一化：异常申报仅按"内容完全相同"去重（防止多设备旧数据回流造成重复）；
   // 同日合并不再自动执行（改由台账明细的「🔧 去重合并」手动触发），以免新录入的同日异常被吞掉。
   records=dedupOnly(records);
@@ -828,7 +872,7 @@ async function abnGhPush(isRetry){
       if(g.ok){var j=await g.json();sha=j.sha;try{remote=JSON.parse(abnB64dec(j.content));}catch(e){}}
     }catch(e){}
     if(remote)abnMerge(remote);
-    var payload={records:records,ov_records:ov_records,meta:{updatedAt:Date.now()}};
+    var payload={records:records,ov_records:ov_records,tomb:tomb,meta:{updatedAt:Date.now()}};
     var content=abnB64enc(JSON.stringify(payload));
     var body={message:'sync abn/overflow '+new Date().toISOString(),content:content,branch:c.branch||'main'};
     if(sha)body.sha=sha;
@@ -1262,7 +1306,9 @@ function editRec(id){
 var editingId=null;
 function delRec(id){
   if(!confirm('确定删除这条异常记录？'))return;
-  records=records.filter(function(x){return x.id!==id;});save(records);toast('已删除');renderList();renderStat();
+  records=records.filter(function(x){return x.id!==id;});
+  markDeleted('abn',id);            /* 写墓碑：其它设备同步后也会删掉，不再回流 */
+  save(records);toast('已删除');renderList();renderStat();
 }
 document.getElementById('listFilter').addEventListener('input',renderList);
 document.getElementById('listCat').addEventListener('change',renderList);
@@ -1538,10 +1584,12 @@ function consolidate(list){
 }
 function dedupMergeAction(){
   if(!records.length){toast('台账为空');return;}
+  var before=records.slice();
   var c=consolidate(records);
   var changed=records.length-c.records.length;
   if(!changed){toast('没有重复或需合并的记录');return;}
   if(!confirm('将删除 '+c.dupCount+' 条完全重复记录，并把 '+c.mergeCount+' 组同一天的异常合并为单条。\n当前 '+records.length+' 条 → 整理后 '+c.records.length+' 条。确定执行？'))return;
+  markRemovedBatch('abn',before,c.records);   /* 墓碑：整理掉的不再被同步拉回 */
   records=c.records; save(records);
   toast('已整理，剩余 '+records.length+' 条'); renderList(); renderStat();
 }
@@ -1567,7 +1615,10 @@ document.getElementById('btnImp').onclick=function(){document.getElementById('im
 document.getElementById('impFile').addEventListener('change',function(e){
   var f=e.target.files[0];if(!f)return;var rd=new FileReader();
   rd.onload=function(){try{var d=JSON.parse(rd.result);
-    if(d.records){if(!confirm('导入将覆盖当前台账数据，确定继续？'))return;records=d.records;save(records);}
+    if(d.records){if(!confirm('导入将覆盖当前台账数据，确定继续？'))return;
+      /* 恢复备份：解除墓碑，避免备份里的记录刚恢复就被墓碑删掉 */
+      tomb.abn={};tomb.abnClearedAt=Date.now();saveTomb();
+      records=d.records;save(records);}
     if(d.settings){settings=d.settings;saveSet(settings);document.getElementById('setBase').value=settings.baseFolder;}
     toast('恢复成功');renderList();renderStat();
   }catch(err){toast('文件解析失败');}};
@@ -1575,6 +1626,7 @@ document.getElementById('impFile').addEventListener('change',function(e){
 });
 document.getElementById('btnClearAll').onclick=function(){
   if(!confirm('将清空全部异常记录与设置，且不可恢复！建议先导出备份。确定清空？'))return;
+  markRemovedBatch('abn',records,[]);   /* 墓碑：清空后不再被同步拉回 */
   records=[];save(records);toast('已清空');renderList();renderStat();
 };
 
@@ -1765,13 +1817,17 @@ document.getElementById('btnConfirmExcel').onclick=function(){
   var c;
   if(mode==='overwrite'){
     if(!confirm('覆盖模式将清空现有 '+records.length+' 条记录，确定？'))return;
+    var oldIds=records.slice();
     c=consolidate(excelParsed);
+    markRemovedBatch('abn',oldIds,c.records);   /* 墓碑：被覆盖掉的旧记录不再回流 */
     records=c.records;
     toast('已导入（去重 '+c.dupCount+' 条 / 合并同日 '+c.mergeCount+' 组）');
   }else{
     // 追加：与现有台账按同一天自动合并、并去除完全重复
-    c=consolidate(records.concat(excelParsed));
+    var mixed=records.concat(excelParsed);
+    c=consolidate(mixed);
     var before=records.length+excelParsed.length;
+    markRemovedBatch('abn',mixed,c.records);    /* 墓碑：去重/合并掉的不再回流 */
     records=c.records;
     toast('已追加并去重合并（共精简 '+(before-records.length)+' 条）');
   }
@@ -1965,7 +2021,9 @@ function ov_editRec(id){
 }
 function ov_delRec(id){
   if(!confirm('确定删除这条溢流记录？'))return;
-  ov_records=ov_records.filter(function(x){return x.id!==id;});ov_save();toast('已删除');ov_renderList();ov_renderStat();
+  ov_records=ov_records.filter(function(x){return x.id!==id;});
+  markDeleted('ov',id);            /* 写墓碑：其它设备同步后也会删掉，不再回流 */
+  ov_save();toast('已删除');ov_renderList();ov_renderStat();
 }
 document.getElementById('ovListFilter').addEventListener('input',ov_renderList);
 document.getElementById('ovListCat').addEventListener('change',ov_renderList);
