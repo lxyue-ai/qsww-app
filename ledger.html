@@ -482,10 +482,15 @@ var OV_DOC_TPL_BASE64="UEsDBBQAAAAIAAWDGF2tUqWRlQEAAMoGAAATAAAAW0NvbnRlbnRfVHlwZ
           <div class="grid">
             <div class="field"><label>溢流日期<span class="req">*</span></label>
               <input type="date" id="f_ov_date"></div>
-            <div class="field"><label>溢流类别<span class="req">*</span></label>
-              <select id="f_ov_cat">
-                <option value="雨水">雨水</option><option value="其他">其他</option>
-              </select></div>
+            <div class="field"><label>溢流类别<span class="req">*</span>（可多选）</label>
+              <div class="catbox" id="f_ov_cat">
+                <label class="cb"><input type="checkbox" value="雨水">雨水</label>
+                <label class="cb"><input type="checkbox" value="施工废水">施工废水</label>
+                <label class="cb"><input type="checkbox" value="设备检修">设备检修</label>
+                <label class="cb"><input type="checkbox" value="停电">停电</label>
+                <label class="cb"><input type="checkbox" value="其他">其他（请于原因中说明）</label>
+              </div>
+              <div style="font-size:12px;color:#888;margin-top:2px">可勾选多个类别；选「其他」时建议在原因里写明具体情况。</div></div>
             <div class="field"><label>申报人 / 填表人</label>
               <input type="text" id="f_ov_rep" placeholder="填表人 / 第三方运维人员"></div>
           </div>
@@ -549,6 +554,7 @@ var OV_DOC_TPL_BASE64="UEsDBBQAAAAIAAWDGF2tUqWRlQEAAMoGAAATAAAAW0NvbnRlbnRfVHlwZ
           <option>雨水</option><option>其他</option>
         </select>
         <button class="btn sm gray" id="btnOvExpJson">导出备份JSON</button>
+        <button class="btn sm gray" id="btnOvExpExcel">导出Excel</button>
         <button class="btn sm gray" id="btnOvImpJson">导入备份JSON</button>
         <button class="btn sm blue" id="btnOvImpExcel">📁 上传Excel导入</button>
         <input type="file" id="ovImpFile" accept="application/json" style="display:none">
@@ -819,7 +825,7 @@ function abnDedupOv(arr){
   var seen={},out=[];
   arr.forEach(function(r){
     if(!r||!r.id)r.id=uid();
-    var k=(r.date||'')+'|'+(r.cat||'')+'|'+(r.cause||'')+'|'+(r.openTime||'')+'|'+(r.closeTime||'')+'|'+(r.openFlow||'')+'|'+(r.closeFlow||'');
+    var k=(r.date||'')+'|'+ovCatArr({cat:r.cat}).join(',')+'|'+(r.cause||'')+'|'+(r.openTime||'')+'|'+(r.closeTime||'')+'|'+(r.openFlow||'')+'|'+(r.closeFlow||'');
     if(seen[k])return; seen[k]=1; out.push(r);
   });
   return out;
@@ -1621,7 +1627,24 @@ function exportExcel(){
   XLSX.writeFile(wb, '异常申报台账_'+new Date().toISOString().slice(0,10)+'.xlsx');
   toast('已导出 Excel');
 }
+/* ===== 溢流台账 Excel 导出 ===== */
+function exportOvExcel(){
+  if(typeof XLSX==='undefined'){toast('Excel 库加载中，请稍后再试');return;}
+  if(!ov_records.length){toast('暂无溢流记录可导出');return;}
+  var rows=ov_records.slice().sort(function(a,b){return a.date<b.date?1:-1;}).map(function(r){
+    return {'溢流日期':r.date,'类别':ovCatArr(r).join('、'),'开阀时间':r.openTime||'',
+      '开阀液位(m)':r.openLevel||'','开阀流量(m³/h)':r.openFlow||'',
+      '关阀时间':r.closeTime||'','关阀液位(m)':r.closeLevel||'','关阀流量(m³/h)':r.closeFlow||'',
+      '溢流原因/情况说明':r.cause||'','申报人/填表人':r.rep||'','关联文件夹':r.folder||''};
+  });
+  var ws=XLSX.utils.json_to_sheet(rows);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '溢流台账');
+  XLSX.writeFile(wb, '溢流台账_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('已导出 Excel');
+}
 document.getElementById('btnExpExcel').onclick=exportExcel;
+document.getElementById('btnOvExpExcel').onclick=exportOvExcel;
 document.getElementById('btnDedup').onclick=dedupMergeAction;
 document.getElementById('btnImpExcelEntry').onclick=function(){document.getElementById('excelFile').click();};
 document.getElementById('btnImp').onclick=function(){document.getElementById('impFile').click();};
@@ -1900,6 +1923,25 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImgModa
 /* ============ 溢流报告 功能 ============ */
 var ov_pendingReportFiles=[], ov_pendingAttFiles=[];
 var ov_editingId=null;
+/* 溢流类别：兼容单字符串(老数据)与数组(多选) */
+function ovCatArr(r){
+  if(!r||!r.cat)return [];
+  if(Array.isArray(r.cat))return r.cat.slice();
+  return String(r.cat).split(/[、，,]/).map(function(x){return x.trim();}).filter(function(x){return x;});
+}
+function ovGetCatValue(){
+  var els=document.querySelectorAll('#f_ov_cat input[type=checkbox]');
+  var a=[];els.forEach(function(el){if(el.checked)a.push(el.value);});return a;
+}
+function ovSetCatValue(v){
+  var set={};ovCatArr({cat:v}).forEach(function(c){set[c]=true;});
+  document.querySelectorAll('#f_ov_cat input[type=checkbox]').forEach(function(el){el.checked=!!set[el.value];});
+}
+function ovCatTags(r){
+  var arr=ovCatArr(r);
+  if(!arr.length)return '<span class="tag other">—</span>';
+  return arr.map(function(c){return '<span class="tag '+(c==='雨水'?'flow':'other')+'">'+esc(c)+'</span>';}).join(' ');
+}
 function ov_autoFolder(){
   var d=document.getElementById('f_ov_date').value;
   if(d&&settings.overflowBase)return settings.overflowBase+'\\'+monthLabel(d);
@@ -1911,7 +1953,8 @@ document.getElementById('f_ov_date').addEventListener('change',function(){
 });
 document.getElementById('f_ov_folder').addEventListener('input',function(){this.dataset.auto='0';});
 function ov_clearForm(){
-  ['f_ov_date','f_ov_cat','f_ov_openTime','f_ov_openLevel','f_ov_openFlow','f_ov_closeTime','f_ov_closeLevel','f_ov_closeFlow','f_ov_cause','f_ov_rep','f_ov_folder','f_ov_report_file','f_ov_att_file'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['f_ov_date','f_ov_openTime','f_ov_openLevel','f_ov_openFlow','f_ov_closeTime','f_ov_closeLevel','f_ov_closeFlow','f_ov_cause','f_ov_rep','f_ov_folder','f_ov_report_file','f_ov_att_file'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ovSetCatValue([]);
   document.getElementById('f_ov_folder').dataset.auto='1';
   ov_pendingReportFiles=[];ov_pendingAttFiles=[];
   ov_renderUploadPreview('ovReportPreview',ov_pendingReportFiles);
@@ -1921,7 +1964,7 @@ function ov_clearForm(){
 document.getElementById('btnOvClear').onclick=ov_clearForm;
 function ov_readForm(){
   return {date:document.getElementById('f_ov_date').value,
-    cat:document.getElementById('f_ov_cat').value,
+    cat:ovGetCatValue(),
     openTime:document.getElementById('f_ov_openTime').value,
     openLevel:document.getElementById('f_ov_openLevel').value.trim(),
     openFlow:document.getElementById('f_ov_openFlow').value.trim(),
@@ -1952,7 +1995,7 @@ document.getElementById('f_ov_report_file').addEventListener('change',function(e
 document.getElementById('f_ov_att_file').addEventListener('change',function(e){handleFileSelect(e,ov_pendingAttFiles,'ovAttPreview');});
 document.getElementById('btnOvSave').onclick=function(){
   var f=ov_readForm();
-  if(!f.date||!f.cat||!f.openTime){toast('请填写溢流日期、类别、开阀时间');return;}
+  if(!f.date||!f.cat.length||!f.openTime){toast('请填写溢流日期、至少勾选一个类别、开阀时间');return;}
   var folder=f.folder||ov_autoFolder();
   if(ov_editingId){
     var r=ov_records.find(function(x){return x.id===ov_editingId;});
@@ -1972,16 +2015,16 @@ function ov_renderList(){
   var q=document.getElementById('ovListFilter').value.trim().toLowerCase();
   var c=document.getElementById('ovListCat').value;
   var rows=ov_records.filter(function(r){
-    if(c&&r.cat!==c)return false;
+    if(c&&ovCatArr(r).indexOf(c)<0)return false;
     if(!q)return true;
-    return (r.cause+' '+r.cat+' '+r.date+' '+(r.openTime||'')+' '+(r.closeTime||'')+' '+(r.note||'')).toLowerCase().indexOf(q)>=0;
+    return (r.cause+' '+ovCatArr(r).join('、')+' '+r.date+' '+(r.openTime||'')+' '+(r.closeTime||'')+' '+(r.note||'')).toLowerCase().indexOf(q)>=0;
   }).sort(function(a,b){return a.date<b.date?1:-1;});
   var tb=document.getElementById('ovTblBody');tb.innerHTML='';
   document.getElementById('ovListEmpty').style.display=rows.length?'none':'block';
   rows.forEach(function(r){
     var tr=document.createElement('tr');
     tr.innerHTML='<td data-label="溢流日期">'+cnDate(r.date)+'</td>'+
-      '<td data-label="类别"><span class="tag '+(r.cat==='雨水'?'flow':'other')+'">'+esc(r.cat)+'</span></td>'+
+      '<td data-label="类别">'+ovCatTags(r)+'</td>'+
       '<td data-label="开阀时间">'+(r.openTime||'')+'</td>'+
       '<td data-label="开阀液位(m)">'+(r.openLevel||'')+'</td>'+
       '<td data-label="开阀流量">'+(r.openFlow||'')+'</td>'+
@@ -2000,7 +2043,7 @@ function renderOvSummary(){
   if(!ov_records.length){el.innerHTML='';return;}
   var ym=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
   var thisMonth=ov_records.filter(function(r){return (r.date||'').slice(0,7)===ym;}).length;
-  var byCat={};ov_records.forEach(function(r){if(r.cat)byCat[r.cat]=(byCat[r.cat]||0)+1;});
+  var byCat={};ov_records.forEach(function(r){ovCatArr(r).forEach(function(cc){byCat[cc]=(byCat[cc]||0)+1;});});
   var topCat='—',topN=0;for(var k in byCat){if(byCat[k]>topN){topN=byCat[k];topCat=k;}}
   el.innerHTML='<span class="chip"><span class="dot"></span>累计 <b>'+ov_records.length+'</b> 条</span>'+
     '<span class="chip">本月 <b>'+thisMonth+'</b> 条</span>'+
@@ -2014,7 +2057,7 @@ function ov_opBtns(r){
 function ov_editRec(id){
   var r=ov_records.find(function(x){return x.id===id;});if(!r)return;
   document.getElementById('f_ov_date').value=r.date;
-  document.getElementById('f_ov_cat').value=r.cat;
+  ovSetCatValue(r.cat);
   document.getElementById('f_ov_openTime').value=r.openTime||'';
   document.getElementById('f_ov_openLevel').value=r.openLevel||'';
   document.getElementById('f_ov_openFlow').value=r.openFlow||'';
@@ -2170,7 +2213,7 @@ function ov_renderStat(){
   var thisYearCnt=validRecords.filter(function(r){return yearOf(r.date)===curYear;}).length;
   var thisMonth=new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
   var thisMonthCnt=validRecords.filter(function(r){return r.date.slice(0,7)===thisMonth;}).length;
-  var byCat={};scope.forEach(function(r){byCat[r.cat]=(byCat[r.cat]||0)+1;});
+  var byCat={};scope.forEach(function(r){ovCatArr(r).forEach(function(cc){byCat[cc]=(byCat[cc]||0)+1;});});
   var topCat='—',topN=0;Object.keys(byCat).forEach(function(k){if(byCat[k]>topN){topN=byCat[k];topCat=k;}});
   document.getElementById('ov_kpis').innerHTML=
     kpi(all,'累计溢流')+kpi(thisYearCnt,curYear+'年')+kpi(thisMonthCnt,'本月')+kpi(topCat+(topN?(' ×'+topN):''),'最多类别');
@@ -2222,7 +2265,7 @@ function ov_doSearch(){
   var box=document.getElementById('ovSearchResult');
   if(!q){box.innerHTML='<div class="empty">输入关键词后点查找</div>';return;}
   var rows=ov_records.filter(function(r){
-    return (r.cause+' '+r.cat+' '+r.date+' '+(r.openTime||'')+' '+(r.closeTime||'')+' '+(r.note||'')).toLowerCase().indexOf(q)>=0;
+    return (r.cause+' '+ovCatArr(r).join('、')+' '+r.date+' '+(r.openTime||'')+' '+(r.closeTime||'')+' '+(r.note||'')).toLowerCase().indexOf(q)>=0;
   });
   if(!rows.length){box.innerHTML='<div class="empty">未找到匹配「'+esc(q)+'」的溢流记录</div>';return;}
   var groups={};
@@ -2237,7 +2280,7 @@ function ov_doSearch(){
 }
 function ov_recCard(r){
   return '<div class="rec"><div class="top"><span class="d">'+cnDate(r.date)+'</span>'+
-    '<span class="tag">'+esc(r.cat)+'</span>'+
+    ovCatTags(r)+
     '</div>'+
     '<div class="p"><b>开阀：</b>'+esc(r.openTime||'')+'　液位 '+esc(r.openLevel||'-')+'m　流量 '+esc(r.openFlow||'-')+' m³/h</div>'+
     '<div class="p"><b>关阀：</b>'+esc(r.closeTime||'')+'　液位 '+esc(r.closeLevel||'-')+'m　流量 '+esc(r.closeFlow||'-')+' m³/h</div>'+
