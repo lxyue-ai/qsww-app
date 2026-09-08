@@ -634,6 +634,22 @@ function getDayOverflow(date){
       };
     });
 }
+/* 兼容多种时间格式：ISO / 空格分隔 / 仅时间（用 dateFallback 补日期）/ 中文年月日 */
+function parseDateTime(str,dateFallback){
+  if(!str)return null;
+  var s=String(str).trim();
+  var d=new Date(s);
+  if(!isNaN(d.getTime()))return d;
+  d=new Date(s.replace(' ','T'));
+  if(!isNaN(d.getTime()))return d;
+  if(dateFallback && /^\d{1,2}:\d{2}/.test(s)){
+    d=new Date(dateFallback+'T'+s);
+    if(!isNaN(d.getTime()))return d;
+  }
+  d=new Date(s.replace(/(\d{4})年(\d{1,2})月(\d{1,2})日?/,function($0,y,m,d){return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');}));
+  if(!isNaN(d.getTime()))return d;
+  return null;
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function yesterdayStr(){var d=new Date();d.setDate(d.getDate()-1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -1150,13 +1166,20 @@ function genReport(){
   var ofNote='';
   /* 优先从溢流台账自动获取当日全部溢流记录（支持一天多次） */
   function oflSentence(r,first){
-    var pre=first?'因天气突降大雨，清水污水厂于':'此外，于';
+    var pre=first?'因天气突降大雨':'此外';
+    var reasonTxt=r.reason?('（溢流原因：'+r.reason+'）'):'';
     if(r.open&&r.close){
-      var od=new Date(r.open),cd=new Date(r.close);
-      var ms=cd-od,hh=Math.floor(ms/3600000),mm=Math.round(ms%3600000/60000);
-      return pre+(od.getMonth()+1)+'月'+od.getDate()+'日'+od.getHours()+'时'+String(od.getMinutes()).padStart(2,'0')+'分申请开启超越管闸阀，开阀时进水流量'+(r.openFlow||'')+'m³/h，集水井液位'+(r.openLevel||'')+'m。根据进水情况于'+cd.getDate()+'日'+cd.getHours()+'时'+String(cd.getMinutes()).padStart(2,'0')+'分关闭超越管闸阀，溢流时长'+hh+'小时'+mm+'分钟，关闭时进水流量'+(r.closeFlow||'')+'m³/h，集水井液位'+(r.closeLevel||'')+'m。';
+      var od=parseDateTime(r.open,r.date),cd=parseDateTime(r.close,r.date);
+      if(!od||!cd){
+        return pre+reasonTxt+'，清水污水厂发生溢流（时间未记录）。';
+      }
+      var ms=cd-od;
+      if(ms<0){var tmp=od;od=cd;cd=tmp;ms=cd-od;}
+      var hh=Math.floor(ms/3600000),mm=Math.round(ms%3600000/60000);
+      if(mm>=60){hh+=1;mm=0;}
+      return pre+reasonTxt+'，清水污水厂于'+(od.getMonth()+1)+'月'+od.getDate()+'日'+od.getHours()+'时'+String(od.getMinutes()).padStart(2,'0')+'分申请开启超越管闸阀，开阀时进水流量'+(r.openFlow||'')+'m³/h，集水井液位'+(r.openLevel||'')+'m。根据进水情况于'+cd.getDate()+'日'+cd.getHours()+'时'+String(cd.getMinutes()).padStart(2,'0')+'分关闭超越管闸阀，溢流时长'+hh+'小时'+mm+'分钟，关闭时进水流量'+(r.closeFlow||'')+'m³/h，集水井液位'+(r.closeLevel||'')+'m。';
     }
-    return pre+(r.reason?('发生溢流：'+r.reason+'.'):'发生溢流（时间未记录）。');
+    return pre+reasonTxt+(r.reason?'，清水污水厂发生溢流：'+r.reason+'。':'，清水污水厂发生溢流（时间未记录）。');
   }
   var tail='';
   var ofs=getDayOverflow(date);
