@@ -614,6 +614,26 @@ function save(suppressPush){try{localStorage.setItem(KEY,JSON.stringify(DB));}ca
 /* 异常申报/溢流已拆分为独立模块，index.html 需直接读取其 localStorage key */
 function getAbnRecords(){try{return JSON.parse(localStorage.getItem('qsww_abn_ledger_v1')||'[]');}catch(e){return [];}}
 function getOvRecords(){try{return JSON.parse(localStorage.getItem('qsww_overflow_v1')||'[]');}catch(e){return [];}}
+/* 把独立溢流模块记录（字段 openTime/openLevel/openFlow/closeTime/closeLevel/closeFlow/cause）
+   归一化为每日上报需要的结构（open/close/.../reason），并按日期筛选 */
+function getDayOverflow(date){
+  var ds=(date||'').slice(0,10);
+  return getOvRecords().filter(function(r){return (r.date||'').slice(0,10)===ds;})
+    .map(function(r){
+      return {
+        id:r.id||'',
+        date:r.date||'',
+        cat:r.cat||'',
+        open:r.openTime||'',
+        close:r.closeTime||'',
+        openFlow:r.openFlow||'',
+        openLevel:r.openLevel||'',
+        closeFlow:r.closeFlow||'',
+        closeLevel:r.closeLevel||'',
+        reason:r.cause||(r.cat?('（'+r.cat+'）'):'')
+      };
+    });
+}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function yesterdayStr(){var d=new Date();d.setDate(d.getDate()-1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -657,8 +677,9 @@ function renderToday(){
   DB.ledgers.abnormal.forEach(function(r){
     if(r.status==='处理中'&&r.date<todayStr())items.push({over:true,txt:'异常报告「'+r.title+'」自 '+r.date+' 起仍未闭环（逾期）',btn:'去处理',fn:"go('abn')"});
   });
-  DB.ledgers.overflow.forEach(function(r){
-    if(r.status==='未闭环')items.push({over:true,txt:'溢流报告（'+r.date+'）尚未闭环',btn:'去处理',fn:"go('overflow')"});
+  var to=todayStr();
+  getOvRecords().forEach(function(r){
+    if(r.date===to)items.push({over:true,txt:'今日（'+cnDate(to)+'）有溢流记录，请确认已生成红头文并计入环保日报',btn:'去处理',fn:"go('overflow')"});
   });
   var h='';
   if(!items.length)h='<div class="today-ok"><svg class="ic" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>今日事项均已处理完毕</div>';
@@ -725,7 +746,8 @@ function periodSludge(a,b){
 var dashDim='month', dashSel=null;
 function collectMonths(){
   var set={};
-  ['water','production','chemical','abnormal','overflow'].forEach(function(c){(DB.ledgers[c]||[]).forEach(function(r){var d=r.date||r.month||'';if(d.length>=7)set[d.slice(0,7)]=1;});});
+  ['water','production','chemical','abnormal'].forEach(function(c){(DB.ledgers[c]||[]).forEach(function(r){var d=r.date||r.month||'';if(d.length>=7)set[d.slice(0,7)]=1;});});
+  getOvRecords().forEach(function(r){var d=r.date||'';if(d.length>=7)set[d.slice(0,7)]=1;});
   DB.reports.forEach(function(r){if((r.date||'').length>=7)set[r.date.slice(0,7)]=1;});
   getAbnRecords().forEach(function(r){if((r.date||'').length>=7)set[r.date.slice(0,7)]=1;});
   getOvRecords().forEach(function(r){if((r.date||'').length>=7)set[r.date.slice(0,7)]=1;});
@@ -835,7 +857,7 @@ function checkMonitor(){
   var h='';
   if(DB.monitor[d]){h='<span class="ok-badge">库中已有 '+d+' 监测数据</span>';btn.style.display='inline-flex';}
   else{h='<span class="muted">库中暂无 '+d+' 监测数据，可在上方粘贴报表解析入库</span>';btn.style.display='none';}
-  var ofr=DB.ledgers.overflow.find(function(r){return r.date===d;});
+  var ofr=getDayOverflow(d)[0];
   if(ofr)h+=' <span class="warn-badge">当日溢流台账有记录，生成上报文字时将自动并入</span>';
   st.innerHTML=h;
 }
@@ -1137,7 +1159,7 @@ function genReport(){
     return pre+(r.reason?('发生溢流：'+r.reason+'.'):'发生溢流（时间未记录）。');
   }
   var tail='';
-  var ofs=DB.ledgers.overflow.filter(function(r){return r.date===date;});
+  var ofs=getDayOverflow(date);
   if(ofs.length){
     tail+=ofs.map(function(r,i){return oflSentence(r,i===0);}).join('');
     tail+='数据达标排放,污染防治设施正常运行。';
@@ -1196,7 +1218,7 @@ function genReportImage(){
   rows.push({type:'3', cells:['氨氮 平均值',outNh3+'mg/l','≤5 mg/l'], over:num(gv('r_nh3'))>=5});
   rows.push({type:'3', cells:['总氮 平均值',outTn+'mg/l','≤15 mg/l'], over:num(gv('r_tn'))>=15});
   rows.push({type:'3', cells:['总磷 平均值',outTp+'mg/l','≤0.5mg/l'], over:num(gv('r_tp'))>=0.5});
-  var hasOverflow=document.getElementById('r_hasOf').checked || DB.ledgers.overflow.some(function(r){return r.date===date&&r.open&&r.close;});
+  var hasOverflow=document.getElementById('r_hasOf').checked || getDayOverflow(date).some(function(r){return r.open&&r.close;});
   if(hasOverflow)rows.push({type:'note', text:'当日发生溢流，详见上报文字'});
 
   var w=720, rowH=48, pr=Math.max(1,Math.floor(window.devicePixelRatio||1));
