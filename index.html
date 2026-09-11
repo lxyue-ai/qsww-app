@@ -1608,7 +1608,7 @@ function renderChlorineReport(ym,mode){
     d.rows.forEach(function(r){h+='<tr><td>'+r.d+'日</td><td>'+(r.w!=null?fmt(r.w):'<span class="muted">-</span>')+'</td><td>'+(r.c!=null?fmt(r.c):'<span class="muted">-</span>')+'</td></tr>';});
     h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fmt(d.sumW)+'</td><td>'+fmt(Math.round(d.sumC*1000)/1000)+'</td></tr>';
     h+='</tbody></table></div>';
-    h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportChlorineReport(\''+ym+'\',\'month\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button><button class="btn ghost" onclick="exportStatsWord()"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>导出 Word（可打印盖章）</button></div>';
+    h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportChlorineReport(\''+ym+'\',\'month\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button><button class="btn ghost" onclick="exportStatsExcel()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 Excel</button><button class="btn ghost" onclick="exportStatsWord()"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>导出 Word（可打印盖章）</button></div>';
     document.getElementById('statsBody').innerHTML=h;
     return;
   }
@@ -1625,7 +1625,7 @@ function renderChlorineReport(ym,mode){
     h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fmt(grandW)+'</td><td>'+fmt(Math.round(grandC*1000)/1000)+'</td><td>'+list.reduce(function(s,a){return s+a.n;},0)+'</td><td>-</td></tr>';
     h+='</tbody></table></div>';
   }
-  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportChlorineReport(\''+ym+'\',\''+mode+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button><button class="btn ghost" onclick="exportStatsWord()"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>导出 Word（可打印盖章）</button></div>';
+  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportChlorineReport(\''+ym+'\',\''+mode+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button><button class="btn ghost" onclick="exportStatsExcel()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 Excel</button><button class="btn ghost" onclick="exportStatsWord()"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>导出 Word（可打印盖章）</button></div>';
   document.getElementById('statsBody').innerHTML=h;
 }
 function exportChlorineReport(ym,mode){
@@ -2435,7 +2435,7 @@ function renderChemReport(ym,mode){
     h+='</tr>';
   });
   h+='</tbody></table></div>';
-  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportChemReportCSV(\''+ym+'\',\''+mode+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出本报表 CSV</button><button class="btn ghost" onclick="exportStatsWord()"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>导出 Word（可打印盖章）</button></div>';
+  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportChemReportCSV(\''+ym+'\',\''+mode+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出本报表 CSV</button><button class="btn ghost" onclick="exportStatsExcel()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 Excel</button><button class="btn ghost" onclick="exportStatsWord()"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>导出 Word（可打印盖章）</button></div>';
   document.getElementById('statsBody').innerHTML=h;
 }
 function renderStats(){
@@ -2487,8 +2487,212 @@ function renderStats(){
     h+='</tr>';
   });
   h+='</tbody></table></div>';
-  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportStatsCSV()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出本报表 CSV</button><button class="btn ghost" onclick="exportStatsWord()"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>导出 Word（可打印盖章）</button></div>';
+  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportStatsCSV()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出本报表 CSV</button><button class="btn ghost" onclick="exportStatsExcel()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 Excel</button><button class="btn ghost" onclick="exportStatsWord()"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>导出 Word（可打印盖章）</button></div>';
   document.getElementById('statsBody').innerHTML=h;
+}
+/* ================= 生产量月度统计表：口径 + 真 XLSX 导出（零依赖） =================
+   口径（经 2026 年 4/5/6/7 月历史表逐行验证，零误差）：
+     板框+带机脱泥机运行时间(h) = 泥饼量 ÷ 1.6 × 4
+     用电量(kw/h)               = 运行时间 × 16.46
+   数据来源：进/出水=水量台账；药剂量=药剂台账当日合计；泥饼量=产泥台账（板框+待机）
+   ================================================================================ */
+var PROD_KWH_PER_HOUR=16.46;   /* 板框+带机脱泥机每小时耗电（度） */
+function r2(v){return Math.round(v*100)/100;}
+function r3(v){return Math.round(v*1000)/1000;}
+function pi(v){return (v==null||v===''||isNaN(v))?'':String(Math.round(Number(v)));}
+function pd1(v){return (v==null||v===''||isNaN(v))?'':Number(v).toFixed(1);}
+function pd2(v){return (v==null||v===''||isNaN(v))?'':Number(v).toFixed(2);}
+/* 汇总某月逐日生产量 */
+function prodMonthRows(ym){
+  var y=+ym.slice(0,4),m=+ym.slice(5,7),dim=new Date(y,m,0).getDate(),rows=[];
+  for(var d=1;d<=dim;d++){
+    var ds=ym+'-'+String(d).padStart(2,'0');
+    var w=(DB.ledgers.water||[]).find(function(r){return r.date===ds;});
+    var chems=(DB.ledgers.chemical||[]).filter(function(r){return r.date===ds;});
+    var sl=(DB.ledgers.sludge||[]).find(function(r){return r.date===ds;});
+    var inQ=w?num(w.inflow):null,outQ=w?num(w.outflow):null,chem=null;
+    if(chems.length){chem=0;chems.forEach(function(r){['pac','c10','salt','carbon','pam','fe','lime'].forEach(function(k){chem+=num(r[k]);});});}
+    var cake=sl?r3(num(sl.plate)+num(sl.standby)):null;
+    var hours=cake!=null?r2(cake/1.6*4):null;
+    var pow=hours!=null?r2(hours*PROD_KWH_PER_HOUR):null;
+    if(inQ!=null||outQ!=null||chem!=null||cake!=null)
+      rows.push({d:d,inQ:inQ,outQ:outQ,chem:chem,cake:cake,hours:hours,pow:pow});
+  }
+  return rows;
+}
+/* 最大值/最小值/平均值/合计（平均值=合计÷有效行数，与历史表口径一致） */
+function prodStats(rows){
+  var n=rows.length;
+  function st(k){
+    var vs=[];rows.forEach(function(r){if(r[k]!=null&&r[k]!=='')vs.push(r[k]);});
+    if(!vs.length)return{max:0,min:0,avg:0,sum:0};
+    var s=0,mx=-Infinity,mn=Infinity;
+    vs.forEach(function(v){s+=v;if(v>mx)mx=v;if(v<mn)mn=v;});
+    return{max:mx,min:mn,avg:s/n,sum:s};
+  }
+  return{n:n,inQ:st('inQ'),outQ:st('outQ'),chem:st('chem'),cake:st('cake'),hours:st('hours'),pow:st('pow')};
+}
+/* ---- 零依赖 XLSX（CRC32 + ZIP store + OOXML） ---- */
+var _CRC_TABLE=null;
+function crc32(buf){
+  if(!_CRC_TABLE){_CRC_TABLE=[];for(var n=0;n<256;n++){var c=n;for(var k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);_CRC_TABLE[n]=c>>>0;}}
+  var c=0xFFFFFFFF;
+  for(var i=0;i<buf.length;i++)c=_CRC_TABLE[(c^buf[i])&0xFF]^(c>>>8);
+  return (c^0xFFFFFFFF)>>>0;
+}
+function zipStore(files){
+  var enc=new TextEncoder(),parts=[],central=[],offset=0;
+  function u16(n){return[n&255,(n>>8)&255];}
+  function u32(n){return[n&255,(n>>8)&255,(n>>16)&255,(n>>>24)&255];}
+  files.forEach(function(f){
+    var nb=enc.encode(f.name),data=typeof f.data==='string'?enc.encode(f.data):f.data;
+    var crc=crc32(data),size=data.length;
+    var hdr=new Uint8Array([].concat([0x50,0x4B,0x03,0x04],u16(20),u16(0x0800),u16(0),u16(0),u16(0),u32(crc),u32(size),u32(size),u16(nb.length),u16(0)));
+    parts.push(hdr,nb,data);
+    central.push({name:nb,crc:crc,size:size,offset:offset});
+    offset+=hdr.length+nb.length+size;
+  });
+  var cdParts=[],cdSize=0;
+  central.forEach(function(c){
+    var hb=new Uint8Array([].concat([0x50,0x4B,0x01,0x02],u16(20),u16(20),u16(0x0800),u16(0),u16(0),u16(0),u32(c.crc),u32(c.size),u32(c.size),u16(c.name.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(c.offset)));
+    cdParts.push(hb,c.name);cdSize+=hb.length+c.name.length;
+  });
+  var eocd=new Uint8Array([].concat([0x50,0x4B,0x05,0x06],u16(0),u16(0),u16(files.length),u16(files.length),u32(cdSize),u32(offset),u16(0)));
+  var all=parts.concat(cdParts,[eocd]),total=0;
+  all.forEach(function(p){total+=p.length;});
+  var out=new Uint8Array(total),pos=0;
+  all.forEach(function(p){out.set(p,pos);pos+=p.length;});
+  return out;
+}
+function xe(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function colName(i){var s='';while(i>0){var m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=(i-m-1)/26;}return s;}
+function xNc(ref,style,val){if(val==null||val===''||isNaN(val))return '<c r="'+ref+'" s="'+style+'"/>';return '<c r="'+ref+'" s="'+style+'"><v>'+(Math.round(val*10000)/10000)+'</v></c>';}
+function xTc(ref,style,txt){return '<c r="'+ref+'" s="'+style+'" t="inlineStr"><is><t xml:space="preserve">'+xe(txt)+'</t></is></c>';}
+var PROD_STYLES='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+'<numFmts count="4"><numFmt numFmtId="164" formatCode="0.0"/><numFmt numFmtId="165" formatCode="0.00"/><numFmt numFmtId="166" formatCode="0"/><numFmt numFmtId="167" formatCode="#,##0.00"/></numFmts>'+
+'<fonts count="3">'+
+'<font><sz val="11"/><color rgb="FF000000"/><name val="宋体"/><charset val="134"/></font>'+
+'<font><b/><sz val="16"/><color rgb="FF000000"/><name val="宋体"/><charset val="134"/></font>'+
+'<font><b/><sz val="11"/><color rgb="FF000000"/><name val="宋体"/><charset val="134"/></font>'+
+'</fonts>'+
+'<fills count="3">'+
+'<fill><patternFill patternType="none"/></fill>'+
+'<fill><patternFill patternType="gray125"/></fill>'+
+'<fill><patternFill patternType="solid"><fgColor rgb="FFEDF2F9"/><bgColor indexed="64"/></patternFill></fill>'+
+'</fills>'+
+'<borders count="2">'+
+'<border><left/><right/><top/><bottom/><diagonal/></border>'+
+'<border><left style="thin"><color rgb="FF000000"/></left><right style="thin"><color rgb="FF000000"/></right><top style="thin"><color rgb="FF000000"/></top><bottom style="thin"><color rgb="FF000000"/></bottom><diagonal/></border>'+
+'</borders>'+
+'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+'<cellXfs count="11">'+
+'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+'<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+'<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>'+
+'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+'<xf numFmtId="166" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+'<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+'<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+'<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+'<xf numFmtId="166" fontId="2" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+'<xf numFmtId="167" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'+
+'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'+
+'</cellXfs>'+
+'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+
+'</styleSheet>';
+var PROD_HEADERS=['日期','进水量（m³）','出水量（m³）','药剂量（㎏）','泥饼量（T）','板框+带机脱泥机运行时间（h）','用电量（kw/h）'];
+function prodXlsxBytes(ym){
+  var rows=prodMonthRows(ym),st=prodStats(rows),m=+ym.slice(5,7);
+  var title='清水县污水处理厂'+m+'月份生产量月度统计表';
+  var x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'+
+    '<dimension ref="A1:G'+(6+rows.length)+'"/>'+
+    '<sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="A1" sqref="A1"/></sheetView></sheetViews>'+
+    '<sheetFormatPr defaultRowHeight="16.5"/>'+
+    '<cols><col min="1" max="1" width="7" customWidth="1"/><col min="2" max="3" width="13" customWidth="1"/><col min="4" max="5" width="11" customWidth="1"/><col min="6" max="6" width="27" customWidth="1"/><col min="7" max="7" width="13" customWidth="1"/></cols>'+
+    '<sheetData>';
+  x+='<row r="1" ht="30" customHeight="1">'+xTc('A1',1,title)+'</row>';
+  x+='<row r="2" ht="34" customHeight="1">';
+  PROD_HEADERS.forEach(function(t,i){x+=xTc(colName(i+1)+'2',2,t);});
+  x+='</row>';
+  rows.forEach(function(r,i){
+    var R=i+3;
+    x+='<row r="'+R+'" ht="18" customHeight="1">'+xTc('A'+R,3,r.d+'日')+
+       xNc('B'+R,4,r.inQ)+xNc('C'+R,4,r.outQ)+xNc('D'+R,4,r.chem)+
+       xNc('E'+R,5,r.cake)+xNc('F'+R,6,r.hours)+xNc('G'+R,6,r.pow)+'</row>';
+  });
+  var statLabels=['最大值','最小值','平均值','合计'],statKeys=['max','min','avg','sum'];
+  statLabels.forEach(function(lb,idx){
+    var R=rows.length+3+idx;
+    x+='<row r="'+R+'" ht="18" customHeight="1">'+xTc('A'+R,7,lb);
+    ['inQ','outQ','chem','cake','hours','pow'].forEach(function(k,j){x+=xNc(colName(j+2)+R,8,st[k][statKeys[idx]]);});
+    x+='</row>';
+  });
+  x+='</sheetData><mergeCells count="1"><mergeCell ref="A1:G1"/></mergeCells>'+
+     '<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>'+
+     '<pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>'+
+     '</worksheet>';
+  return xlsxWrap(x,'生产量月度统计表',title);
+}
+/* 把一段 sheet xml 打包为 .xlsx 字节（共用外壳） */
+function xlsxWrap(sheetXml,sheetName,docTitle){
+  var ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+    '<Default Extension="xml" ContentType="application/xml"/>'+
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+
+    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'+
+    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+
+    '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'+
+    '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'+
+    '</Types>';
+  var rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'+
+    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'+
+    '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>'+
+    '</Relationships>';
+  var wbx='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+    '<sheets><sheet name="'+xe(sheetName)+'" sheetId="1" r:id="rId1"/></sheets></workbook>';
+  var wbRels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'+
+    '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'+
+    '</Relationships>';
+  var core='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'+
+    '<dc:title>'+xe(docTitle)+'</dc:title><dc:creator>清水县污水处理厂</dc:creator>'+
+    '<cp:lastModifiedBy>清水县污水处理厂</cp:lastModifiedBy>'+
+    '<dcterms:created xsi:type="dcterms:W3CDTF">2026-01-01T00:00:00Z</dcterms:created>'+
+    '<dcterms:modified xsi:type="dcterms:W3CDTF">2026-01-01T00:00:00Z</dcterms:modified></cp:coreProperties>';
+  var app='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'+
+    '<Application>Microsoft Excel</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop>'+
+    '<HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>工作表</vt:lpstr></vt:variant><vt:variant><vt:i4>1</vt:i4></vt:variant></vt:vector></HeadingPairs>'+
+    '<TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>'+xe(sheetName)+'</vt:lpstr></vt:vector></TitlesOfParts>'+
+    '<Company></Company><LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0300</AppVersion></Properties>';
+  return zipStore([
+    {name:'[Content_Types].xml',data:ct},
+    {name:'_rels/.rels',data:rels},
+    {name:'docProps/core.xml',data:core},
+    {name:'docProps/app.xml',data:app},
+    {name:'xl/workbook.xml',data:wbx},
+    {name:'xl/_rels/workbook.xml.rels',data:wbRels},
+    {name:'xl/styles.xml',data:PROD_STYLES},
+    {name:'xl/worksheets/sheet1.xml',data:sheetXml}
+  ]);
+}
+function exportProductXlsx(ym){
+  ym=ym||thisMonth();
+  try{
+    var bytes=prodXlsxBytes(ym),m=+ym.slice(5,7);
+    download(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
+      '清水县污水处理厂'+m+'月份生产量月度统计表.xlsx');
+    toast('已导出 Excel 文件');
+  }catch(e){toast('导出失败：'+((e&&e.message)||e));}
 }
 /* ================= 生产量 / 产泥 / 减排运行 报表（自动汇总，不再依赖单独录入） ================= */
 function productionAggMonth(mo){
@@ -2509,41 +2713,31 @@ function productionAggMonth(mo){
 function renderProductionReport(ym,mode){
   mode=mode||'month';
   var h='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' 生产量报表（自动汇总）</h2>';
-  h+='<div class="section-note">自动汇总：进水/出水取水量台账；加氯量=进水×7/1000；药剂=当日各药剂求和（药剂台账）；泥饼量=板框+待机（产泥台账）；脱泥机运行=产泥台账运行小时；用电量按当月总用电量÷当月天数估算（电费台账）。无需在「生产量」台账单独录入。</div>';
   if(mode==='month'){
-    var y=+ym.slice(0,4),m=+ym.slice(5,7),dim=new Date(y,m,0).getDate();
-    var ele=DB.ledgers.electric.find(function(r){return (r.month||'').slice(0,7)===ym;});
-    var eleDay=ele?Math.round((num(ele.oldKwh)+num(ele.newKwh))/dim*100)/100:null,eleTot=ele?Math.round((num(ele.oldKwh)+num(ele.newKwh))*100)/100:null;
-    var rows=[],T={i:0,o:0,cl:0,ch:0,ca:0,po:0,ho:0},n=0;
-    for(var d=1;d<=dim;d++){
-      var ds=ym+'-'+String(d).padStart(2,'0');
-      var w=DB.ledgers.water.find(function(r){return r.date===ds;});
-      var chems=DB.ledgers.chemical.filter(function(r){return r.date===ds;});
-      var sl=DB.ledgers.sludge.find(function(r){return r.date===ds;});
-      var inQ=w?num(w.inflow):null,outQ=w?num(w.outflow):null,chemSum=0;
-      chems.forEach(function(r){['pac','c10','salt','carbon','pam','fe','lime'].forEach(function(k){chemSum+=num(r[k]);});});
-      var cake=sl?Math.round((num(sl.plate)+num(sl.standby))*1000)/1000:null,ho=sl?num(sl.hours):null,cl=inQ!=null?Math.round(inQ*7/1000*1000)/1000:null,po=eleDay;
-      if(inQ!=null)T.i+=inQ;if(outQ!=null)T.o+=outQ;if(cl!=null)T.cl+=cl;if(chemSum)T.ch+=chemSum;if(cake!=null)T.ca+=cake;if(po!=null)T.po+=po;if(ho!=null)T.ho+=ho;
-      if(inQ!=null||outQ!=null||chemSum||cake!=null||po!=null||ho!=null)n++;
-      rows.push({d:d,inQ:inQ,outQ:outQ,cl:cl,chem:chemSum?Math.round(chemSum*100)/100:null,cake:cake,po:po,ho:ho});
-    }
-    if(!n){h+='<div class="muted">该期间暂无数据，请先在「台账中心」录入水量、药剂、产泥等台账。</div>';document.getElementById('statsBody').innerHTML=h;return;}
-    h+='<div class="tbwrap"><table class="tb"><thead><tr><th>日期</th><th>进水量(m³)</th><th>出水量(m³)</th><th>加氯量(kg)</th><th>药剂量(kg)</th><th>泥饼量(T)</th><th>用电量(度/天)</th><th>脱泥机运行(h)</th></tr></thead><tbody>';
-    rows.forEach(function(r){h+='<tr><td>'+r.d+'日</td><td>'+fe(r.inQ)+'</td><td>'+fe(r.outQ)+'</td><td>'+fe(r.cl)+'</td><td>'+fe(r.chem)+'</td><td>'+fe(r.cake)+'</td><td>'+fe(r.po)+'</td><td>'+fe(r.ho)+'</td></tr>';});
-    h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(Math.round(T.i*100)/100)+'</td><td>'+fe(Math.round(T.o*100)/100)+'</td><td>'+fe(Math.round(T.cl*100)/100)+'</td><td>'+fe(Math.round(T.ch*100)/100)+'</td><td>'+fe(Math.round(T.ca*100)/100)+'</td><td>'+(eleTot!=null?fe(eleTot):'-')+'</td><td>'+fe(Math.round(T.ho*100)/100)+'</td></tr>';
+    h+='<div class="section-note">自动汇总：进/出水取水量台账；药剂量取药剂台账当日合计；泥饼量=板框+待机（产泥台账）；<b>板框+带机脱泥机运行时间(h) = 泥饼量 ÷ 1.6 × 4</b>；<b>用电量(kw/h) = 运行时间 × 16.46</b>（脱水机+带机每小时耗电，与 4~7 月历史表口径一致）。无需在「生产量」台账单独录入。</div>';
+    var rows=prodMonthRows(ym),st=prodStats(rows);
+    if(!st.n){h+='<div class="muted">该期间暂无数据，请先在「台账中心」录入水量、药剂、产泥等台账。</div>';document.getElementById('statsBody').innerHTML=h;return;}
+    h+='<div class="tbwrap"><table class="tb"><thead><tr><th>日期</th><th>进水量(m³)</th><th>出水量(m³)</th><th>药剂量(kg)</th><th>泥饼量(T)</th><th>板框+带机脱泥机运行时间(h)</th><th>用电量(kw/h)</th></tr></thead><tbody>';
+    rows.forEach(function(r){h+='<tr><td>'+r.d+'日</td><td>'+pi(r.inQ)+'</td><td>'+pi(r.outQ)+'</td><td>'+pi(r.chem)+'</td><td>'+pd1(r.cake)+'</td><td>'+pd2(r.hours)+'</td><td>'+pd2(r.pow)+'</td></tr>';});
+    ['最大值','最小值','平均值','合计'].forEach(function(lb,i){
+      var k=['max','min','avg','sum'][i];
+      h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>'+lb+'</td>';
+      ['inQ','outQ','chem','cake','hours','pow'].forEach(function(kk){h+='<td>'+pi(st[kk][k])+'</td>';});
+      h+='</tr>';
+    });
     h+='</tbody></table></div>';
-    h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportProductionCSV(\''+ym+'\',\'month\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsWord()">导出 Word（可打印盖章）</button></div>';
+    h+='<div class="row" style="margin-top:12px"><button class="btn" onclick="exportProductXlsx(\''+ym+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 Excel（月度统计表）</button><button class="btn ghost" onclick="exportProductionCSV(\''+ym+'\',\'month\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsWord(\'statsBody\')"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>导出 Word（可打印盖章）</button></div>';
     document.getElementById('statsBody').innerHTML=h;return;
   }
   var months=monthsInPeriod(mode,ym).map(productionAggMonth),tIn=0,tOut=0,tCl=0,tCh=0,tCa=0,tPo=0,tHo=0;
   months.forEach(function(r){tIn+=r.sumIn;tOut+=r.sumOut;tCl+=r.cl;tCh+=r.ch;tCa+=r.ca;if(r.po!=null)tPo+=r.po;tHo+=r.ho;});
   var h2='<h2 style="margin-bottom:10px">'+periodName(mode,ym)+' 生产量报表（汇总）</h2>';
-  h2+='<div class="section-note">自动汇总：进水/出水取水量台账；加氯量=进水×7/1000；药剂=药剂台账当日求和；泥饼量=产泥台账板框+待机；脱泥机运行=产泥台账运行小时；用电量=电费台账当月总用电量。</div>';
+  h2+='<div class="section-note">自动汇总：进/出水取水量台账；药剂量=药剂台账当日求和；泥饼量=产泥台账（板框+待机）；板框+带机脱泥机运行时间(h)=泥饼量÷1.6×4；用电量(kw/h)=运行时间×16.46。</div>';
   h2+='<div class="tbwrap"><table class="tb"><thead><tr><th>月份</th><th>进水量合计(m³)</th><th>出水量合计(m³)</th><th>加氯量(kg)</th><th>药剂量(kg)</th><th>泥饼量(T)</th><th>用电量(度)</th><th>脱泥机运行(h)</th></tr></thead><tbody>';
   months.forEach(function(r){h2+='<tr><td>'+r.y+'年'+r.m+'月</td><td>'+fe(r.sumIn)+'</td><td>'+fe(r.sumOut)+'</td><td>'+fe(r.cl)+'</td><td>'+fe(r.ch)+'</td><td>'+fe(r.ca)+'</td><td>'+(r.po!=null?fe(r.po):'-')+'</td><td>'+fe(r.ho)+'</td></tr>';});
   h2+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(tIn)+'</td><td>'+fe(tOut)+'</td><td>'+fe(tCl)+'</td><td>'+fe(tCh)+'</td><td>'+fe(tCa)+'</td><td>'+(tPo?fe(Math.round(tPo*100)/100):'-')+'</td><td>'+fe(Math.round(tHo*100)/100)+'</td></tr>';
   h2+='</tbody></table></div>';
-  h2+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportProductionCSV(\''+ym+'\',\''+mode+'\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsWord()">导出 Word（可打印盖章）</button></div>';
+  h2+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportProductionCSV(\''+ym+'\',\''+mode+'\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsExcel()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 Excel</button><button class="btn ghost" onclick="exportStatsWord()">导出 Word（可打印盖章）</button></div>';
   document.getElementById('statsBody').innerHTML=h2;
 }
 function exportProductionCSV(ym,mode){
@@ -2577,7 +2771,7 @@ function renderSludgeReport(ym,mode){
     rows.forEach(function(r){h+='<tr><td>'+r.d+'日</td><td>'+fe(r.p)+'</td><td>'+fe(r.s)+'</td><td>'+fe(r.tot)+'</td><td>'+fe(r.tr)+'</td><td>'+fe(r.ho)+'</td></tr>';});
     h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(Math.round(T.p*1000)/1000)+'</td><td>'+fe(Math.round(T.s*1000)/1000)+'</td><td>'+fe(Math.round(T.t*1000)/1000)+'</td><td>'+fe(Math.round(T.tr*1000)/1000)+'</td><td>'+fe(Math.round(T.ho*100)/100)+'</td></tr>';
     h+='</tbody></table></div>';
-    h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportSludgeCSV(\''+ym+'\',\'month\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsWord()">导出 Word（可打印盖章）</button></div>';
+    h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportSludgeCSV(\''+ym+'\',\'month\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsExcel()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 Excel</button><button class="btn ghost" onclick="exportStatsWord()">导出 Word（可打印盖章）</button></div>';
     document.getElementById('statsBody').innerHTML=h;return;
   }
   var months=monthsInPeriod(mode,ym).map(sludgeAggMonth),tP=0,tS=0,tT=0,tTr=0,tHo=0;
@@ -2588,7 +2782,7 @@ function renderSludgeReport(ym,mode){
   months.forEach(function(r){h2+='<tr><td>'+r.y+'年'+r.m+'月</td><td>'+fe(r.p)+'</td><td>'+fe(r.s)+'</td><td>'+fe(r.t)+'</td><td>'+fe(r.tr)+'</td><td>'+fe(r.ho)+'</td></tr>';});
   h2+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(Math.round(tP*1000)/1000)+'</td><td>'+fe(Math.round(tS*1000)/1000)+'</td><td>'+fe(Math.round(tT*1000)/1000)+'</td><td>'+fe(Math.round(tTr*1000)/1000)+'</td><td>'+fe(Math.round(tHo*100)/100)+'</td></tr>';
   h2+='</tbody></table></div>';
-  h2+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportSludgeCSV(\''+ym+'\',\''+mode+'\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsWord()">导出 Word（可打印盖章）</button></div>';
+  h2+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportSludgeCSV(\''+ym+'\',\''+mode+'\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsExcel()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 Excel</button><button class="btn ghost" onclick="exportStatsWord()">导出 Word（可打印盖章）</button></div>';
   document.getElementById('statsBody').innerHTML=h2;
 }
 function exportSludgeCSV(ym,mode){
@@ -2620,7 +2814,7 @@ function renderReductionReport(ym,mode){
     rows.forEach(function(r){h+='<tr><td>'+r.d+'日</td><td>'+fe(r.b)+'</td><td>'+fe(r.pu)+'</td><td>'+fe(r.de)+'</td><td>'+fe(r.dec)+'</td></tr>';});
     h+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(Math.round(T.b*10)/10)+'</td><td>'+fe(Math.round(T.pu*10)/10)+'</td><td>'+fe(Math.round(T.de*10)/10)+'</td><td>'+fe(Math.round(T.dec*10)/10)+'</td></tr>';
     h+='</tbody></table></div>';
-    h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportReductionCSV(\''+ym+'\',\'month\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsWord()">导出 Word（可打印盖章）</button></div>';
+    h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportReductionCSV(\''+ym+'\',\'month\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsExcel()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 Excel</button><button class="btn ghost" onclick="exportStatsWord()">导出 Word（可打印盖章）</button></div>';
     document.getElementById('statsBody').innerHTML=h;return;
   }
   var months=monthsInPeriod(mode,ym).map(reductionAggMonth),tB=0,tPu=0,tDe=0,tDec=0;
@@ -2631,7 +2825,7 @@ function renderReductionReport(ym,mode){
   months.forEach(function(r){h2+='<tr><td>'+r.y+'年'+r.m+'月</td><td>'+fe(r.b)+'</td><td>'+fe(r.pu)+'</td><td>'+fe(r.de)+'</td><td>'+fe(r.dec)+'</td></tr>';});
   h2+='<tr style="font-weight:700;background:var(--blue-xl)"><td>合计</td><td>'+fe(Math.round(tB*10)/10)+'</td><td>'+fe(Math.round(tPu*10)/10)+'</td><td>'+fe(Math.round(tDe*10)/10)+'</td><td>'+fe(Math.round(tDec*10)/10)+'</td></tr>';
   h2+='</tbody></table></div>';
-  h2+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportReductionCSV(\''+ym+'\',\''+mode+'\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsWord()">导出 Word（可打印盖章）</button></div>';
+  h2+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportReductionCSV(\''+ym+'\',\''+mode+'\')">导出 CSV</button><button class="btn ghost" onclick="exportStatsExcel()"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 Excel</button><button class="btn ghost" onclick="exportStatsWord()">导出 Word（可打印盖章）</button></div>';
   document.getElementById('statsBody').innerHTML=h2;
 }
 function exportReductionCSV(ym,mode){
@@ -3070,6 +3264,63 @@ function exportStatsWord(targetId){
   Array.prototype.forEach.call(clone.querySelectorAll('.row'),function(el){if(el.querySelector('button')){el.parentNode&&el.parentNode.removeChild(el);}});
   Array.prototype.forEach.call(clone.querySelectorAll('button,input,select,svg'),function(el){if(el.parentNode)el.parentNode.removeChild(el);});
   exportWord(title+'.doc',clone.innerHTML);
+}
+/* 通用：把当前已渲染的报表导出为 Excel（.xlsx，带边框，可直接打印盖章） */
+function exportStatsExcel(targetId){
+  var id=targetId||'statsBody';
+  var src=document.getElementById(id);
+  if(!src||!src.innerHTML.trim()){toast('请先生成报表再导出');return;}
+  var tb=src.querySelector('table');
+  if(!tb){toast('该报表暂无可导出的表格');return;}
+  var title='报表',h2=src.querySelector('h2');
+  if(h2)title=(h2.textContent||'').replace(/\s+/g,'').replace(/[\\/:*?"<>|]/g,'')||title;
+  var head=[],htr=tb.querySelector('thead tr');
+  if(htr)Array.prototype.forEach.call(htr.children,function(th){head.push((th.textContent||'').trim());});
+  var body=[];
+  Array.prototype.forEach.call(tb.querySelectorAll('tbody tr'),function(tr){
+    var row=[];Array.prototype.forEach.call(tr.children,function(td){row.push((td.textContent||'').trim());});
+    body.push(row);
+  });
+  if(!head.length&&body.length)head=body.shift();
+  if(!head.length||!body.length){toast('该报表暂无可导出的表格');return;}
+  try{
+    var bytes=tableXlsxBytes(title,head,body);
+    download(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),title+'.xlsx');
+    toast('已导出 Excel 文件');
+  }catch(e){toast('导出失败：'+((e&&e.message)||e));}
+}
+/* 由二维表数据生成 xlsx 字节（标题行 + 表头 + 数据，自动识别数值/文本） */
+function tableXlsxBytes(title,head,body){
+  var ncol=head.length;
+  var x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'+
+    '<dimension ref="A1:'+colName(ncol)+'2'+(body.length+1)+'"/>'+
+    '<sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews>'+
+    '<sheetFormatPr defaultRowHeight="16.5"/>'+
+    '<cols><col min="1" max="2" width="16" customWidth="1"/><col min="3" max="'+Math.max(3,ncol)+'" width="14" customWidth="1"/></cols>'+
+    '<sheetData>';
+  x+='<row r="1" ht="28" customHeight="1">'+xTc('A1',1,title)+'</row>';
+  x+='<row r="2" ht="30" customHeight="1">';
+  head.forEach(function(t,k){x+=xTc(colName(k+1)+'2',2,t);});
+  x+='</row>';
+  body.forEach(function(row,ri){
+    var R=ri+3;
+    x+='<row r="'+R+'" ht="18" customHeight="1">';
+    for(var k=0;k<ncol;k++){
+      var ref=colName(k+1)+R,raw=row[k]==null?'':String(row[k]).trim();
+      if(raw===''||raw==='-'){x+='<c r="'+ref+'" s="3"/>';continue;}
+      var cleaned=raw.replace(/[¥￥,，\s]/g,'').replace(/%$/,'');
+      if(/^-?\d+(\.\d+)?$/.test(cleaned))x+=xNc(ref,k===0?4:9,parseFloat(cleaned));
+      else x+=xTc(ref,k===0?3:10,raw);
+    }
+    x+='</row>';
+  });
+  x+='</sheetData><mergeCells count="1"><mergeCell ref="A1:'+colName(ncol)+'1"/></mergeCells>'+
+     '<pageMargins left="0.4" right="0.4" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>'+
+     '<pageSetup paperSize="9" orientation="'+(ncol>5?'landscape':'portrait')+'" fitToWidth="1" fitToHeight="0"/>'+
+     '</worksheet>';
+  return xlsxWrap(x,title.slice(0,20)||'报表',title);
 }
 
 /* ================= 厂内自检报告 ================= */
