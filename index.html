@@ -607,6 +607,8 @@ function load(){try{var s=localStorage.getItem(KEY);DB=s?JSON.parse(s):blank();}
   DB.ledgers.abnormal=(DB.ledgers.abnormal||[]).filter(function(r){return !String(r.title||'').startsWith('示例：');});
   DB.ledgers.invoice=(DB.ledgers.invoice||[]).filter(function(r){return !String(r.no||'').startsWith('示例-');});
   if(abnBefore!==DB.ledgers.abnormal.length||invBefore!==DB.ledgers.invoice.length){save();}
+  /* 电费/减排汇总/药剂库存：每次打开自动合并重复月份、清理导入留下的空占位行（写墓碑，防云端旧数据回流） */
+  dedupeMonthLedgers(true);
 }
 function save(suppressPush){try{localStorage.setItem(KEY,JSON.stringify(DB));}catch(e){toast('存储空间不足，请导出备份后删除部分图片');}
   if(!suppressPush&&ghEnabled()){if(ghTimer)clearTimeout(ghTimer);ghTimer=setTimeout(ghPush,1000);}
@@ -1445,7 +1447,7 @@ function renderElectric(){
       +'<td><button class="iconbtn" title="编辑" onclick="ledgerEdit(\'electric\',\''+r.id+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16v4zM14 6l4 4"/></svg></button><button class="iconbtn" title="删除" onclick="delLedgerRow(\'electric\',\''+r.id+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13"/></svg></button></td></tr>';
   });
   h+='</tbody></table></div>';
-  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportCSV(\'electric\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button></div>';
+  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportCSV(\'electric\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button><button class="btn ghost" onclick="dedupeMonthLedgers(false);renderElectric();">整理重复月份</button><span class="muted" style="align-self:center;font-size:13px">每个月只保留一条记录，出现重复月份时点一下即可合并</span></div>';
   document.getElementById('ledgerBody').innerHTML=h;
   /* 渲染柱状图 */
   var chartData=rows.map(function(r){return {label:(r.month||'').slice(5),value: electricChartMetric==='kwh'?Math.round((num(r.oldKwh)+num(r.newKwh))*100)/100:Math.round((num(r.oldFee)+num(r.newFee))*100)/100,title:(r.month||'')};});
@@ -1700,6 +1702,19 @@ function addLedgerRow(cat){
     var ex=DB.ledgers[cat].find(function(x){return x.id===curEdit.id;});
     if(ex){cfg.fields.forEach(function(f){if(f.k!=='id')ex[f.k]=r[f.k];});ex.updatedAt=Date.now();}
     curEdit={cat:null,id:null};save();renderLedger();renderToday();renderSludge();toast('已修改');return;
+  }
+  /* 月份唯一台账（电费/减排汇总/药剂库存）：同月已存在则更新那一条，绝不新增重复月份 */
+  if(r.month&&(cat==='electric'||cat==='reductionSum'||cat==='chemStock')){
+    var nk=monthLedgerKey(cat,r),dup=null;
+    (DB.ledgers[cat]||[]).forEach(function(x){if(!dup&&monthLedgerKey(cat,x)===nk)dup=x;});
+    if(dup){
+      cfg.fields.forEach(function(f){if(f.k==='id'||f.k==='month')return;var v=r[f.k];if(v!=null&&(''+v).trim()!=='')dup[f.k]=v;});
+      dup.month=normMonth(dup.month)||r.month;dup.updatedAt=Date.now();
+      curEdit={cat:null,id:null};
+      save();renderLedger();renderToday();renderSludge();toast('该月份已有记录，已更新（不会新增重复月份）');
+      return;
+    }
+    r.month=normMonth(r.month)||r.month;
   }
   r.id=uid();r.updatedAt=Date.now();
   DB.ledgers[cat].push(r);save();renderLedger();renderToday();renderSludge();toast('已添加');
@@ -3556,6 +3571,77 @@ function buildSyncPayload(){
   if(c.ledgers)for(var k in c.ledgers){if(Array.isArray(c.ledgers[k]))c.ledgers[k].forEach(function(r){if(r&&r.img)delete r.img;});}
   return c;
 }
+/* ===== 月份唯一台账（电费 / 减排汇总 / 药剂库存）防重复月份 =====
+   1) 月份格式统一成 YYYY-MM（兼容 2026-3 / 2026年3月 / 3月 等写法）
+   2) 同一个月份只允许存在一条记录：新增、导入、跨设备同步都按「月份」合并 */
+function normMonth(v){
+  if(v==null)return '';
+  var s=(''+v).trim().replace(/[年\/\.]/g,'-').replace(/月/g,'').replace(/-+$/,'').replace(/\s+/g,'');
+  var m=s.match(/^(\d{4})-(\d{1,2})/);
+  if(m)return m[1]+'-'+('0'+m[2]).slice(-2);
+  var m2=s.match(/^(\d{4})(\d{2})$/);
+  if(m2)return m2[1]+'-'+m2[2];
+  var m3=s.match(/^(\d{1,2})$/);
+  if(m3)return new Date().getFullYear()+'-'+('0'+m3[1]).slice(-2);
+  return s;
+}
+/* 月份类台账的分组键：电费/减排汇总 = 月份；药剂库存 = 月份 + 药剂名 */
+function monthLedgerKey(cat,r){
+  if(!r)return '';
+  if(cat==='chemStock')return normMonth(r.month)+'\u0001'+(''+(r.item==null?'':r.item)).trim();
+  return normMonth(r.month);
+}
+/* 业务字段里有几个是「有值」的（用来判断同月两条记录哪条数据更全） */
+function filledCount(r,flds){
+  var n=0;(flds||[]).forEach(function(f){
+    if(f==='month'||f==='id'||f==='item')return;
+    var v=r[f];if(v==null||(''+v).trim()==='')return;
+    if(!isNaN(Number(v))&&Number(v)===0)return;
+    n++;
+  });
+  return n;
+}
+/* 整理月份唯一台账：归一化月份 → 同月合并（保留数据最全的一条，其余写墓碑防同步回流）→ 清掉全空的占位行 */
+function dedupeMonthLedgers(silent){
+  var cats=['electric','reductionSum','chemStock'],changed=0;
+  cats.forEach(function(cat){
+    var arr=DB.ledgers[cat];if(!arr||!arr.length)return;
+    var flds=(LEDGERS[cat]&&LEDGERS[cat].fields?LEDGERS[cat].fields:[]).map(function(f){return f.k;}).filter(function(k){return k!=='id';});
+    /* 1) 月份格式统一 */
+    arr.forEach(function(r){if(r&&r.month){var nm=normMonth(r.month);if(nm&&nm!==r.month){r.month=nm;changed++;}}});
+    /* 2) 同月合并：保留数据最全的一条，把另一条里「本条缺的值」补进来 */
+    var groups={},order=[];
+    arr.forEach(function(r){if(!r)return;var k=monthLedgerKey(cat,r);if(!(k in groups)){groups[k]=[];order.push(k);}groups[k].push(r);});
+    var keep=[];
+    order.forEach(function(k){
+      var g=groups[k];
+      if(g.length===1){keep.push(g[0]);return;}
+      g.sort(function(a,b){return filledCount(b,flds)-filledCount(a,flds)||((b.updatedAt||0)-(a.updatedAt||0));});
+      var best=g[0],have={};
+      flds.forEach(function(f){have[f]=(best[f]==null?'':(''+best[f]).trim());});
+      for(var i=1;i<g.length;i++){var o=g[i];flds.forEach(function(f){
+        if(f==='month')return;
+        var v=(o[f]==null?'':(''+o[f]).trim());
+        if(v!==''&&(have[f]===''||(!isNaN(Number(have[f]))&&Number(have[f])===0))){best[f]=o[f];have[f]=v;}
+      });}
+      best.month=best.month||k;best.updatedAt=Date.now();
+      DB.tomb=DB.tomb||{};DB.tomb[cat]=DB.tomb[cat]||{};
+      for(var j=1;j<g.length;j++){if(g[j].id)DB.tomb[cat][g[j].id]=Date.now();changed++;}
+      keep.push(best);
+    });
+    /* 3) 清掉整行没有任何数据的空占位行（导入模板留下的空月份） */
+    keep=keep.filter(function(r){
+      var has=filledCount(r,flds)>0;
+      if(!has&&flds.indexOf('note')>=0&&r.note!=null&&(''+r.note).trim()!=='')has=true;
+      if(!has){DB.tomb=DB.tomb||{};DB.tomb[cat]=DB.tomb[cat]||{};if(r.id)DB.tomb[cat][r.id]=Date.now();changed++;return false;}
+      return true;
+    });
+    DB.ledgers[cat]=keep;
+  });
+  if(changed)save(true);
+  if(!silent&&changed)toast('已整理台账：合并重复月份 / 清理空行共 '+changed+' 处');
+  return changed;
+}
 function natKeyOf(lk,r){
   if(!r||typeof r!=='object')return null;
   /* 转运/产泥：同一天可有多车/多条，绝不按日期压缩！
@@ -3563,8 +3649,8 @@ function natKeyOf(lk,r){
      同 id（同一条记录在多设备各自编辑）→ 自动合并；不同 id（同日不同车）→ 各自保留、互不删除。
      净重/车牌/备注等常改字段一律不进键，改值不会产生重复。 */
   if(lk==='transfer'||lk==='sludge')return null;
-  if(lk==='reductionSum'||lk==='chemStock'){if(r.month)return 'm:'+r.month;}
-  if(lk==='electric'){if(r.year&&r.month)return 'ym:'+r.year+'-'+r.month;}
+  if(lk==='reductionSum'||lk==='electric'){if(r.month)return 'm:'+normMonth(r.month);} /* 一个月一条：同月跨设备自动合并，不再出现重复月份 */
+  if(lk==='chemStock'){if(r.month)return 'm:'+normMonth(r.month)+'\u0001'+(''+(r.item==null?'':r.item)).trim();} /* 药剂库存：同月同药剂才算一条 */
   if(r.date)return 'd:'+r.date; /* 其余台账（水量/生产/药剂等）一天一条 */
   return null;
 }
@@ -3586,8 +3672,13 @@ function mergeDB(remote){
       var k=key(r);
       if(k){
         if(map[k]){
-          var ex=map[k],ik=(r.updatedAt||0),ek=(ex.updatedAt||0),chosen=(ik>=ek)?r:ex;
+          var ex=map[k],ik=(r.updatedAt||0),ek=(ex.updatedAt||0),chosen=(ik>=ek)?r:ex,other=(ik>=ek)?ex:r;
           var m=Object.assign({},chosen);
+          /* 月份唯一台账（电费/减排汇总/药剂库存）：同月两条合并，把另一条里「本条缺的值」补进来，避免合并时丢数据 */
+          if(k.indexOf('m:')===0){
+            var lf=(LEDGERS[lk]&&LEDGERS[lk].fields)?LEDGERS[lk].fields:[];
+            lf.forEach(function(ff){if(ff.k==='id'||ff.k==='month')return;var cv=m[ff.k],ov=other[ff.k];if((cv==null||cv==='')&&ov!=null&&ov!=='')m[ff.k]=ov;});
+          }
           if(r.img==null&&ex.img!=null)m.img=ex.img;
           if(ex.img==null&&r.img!=null)m.img=r.img;
           map[k]=m;
@@ -3905,6 +3996,9 @@ function buildImportRecords(rows,det,map,cat,ym){
       }
     }
     if(!rec[keyF])continue;
+    /* 只有日期/月份、没有任何实际数据的行（如源表里列出的空月份）不入库，避免台账里出现空占位行 */
+    var hasData=false;for(var hk in rec){if(hk!==keyF&&rec[hk]!=null&&(''+rec[hk]).trim()!==''){hasData=true;break;}}
+    if(!hasData)continue;
     recs.push(rec);
   }
   return recs;
@@ -3932,13 +4026,15 @@ function mergeImport(cat,recs){
   var arr=DB.ledgers[cat]||(DB.ledgers[cat]=[]);
   var keyF=IMPORT_MAP[cat].date?'date':'month';
   /* 水量台账：日期唯一，导入应「按日期覆盖」（已有同日更新字段、新增缺失日），不产生重复日期，确保与权威 WPS 表一致 */
-  if(cat==='water'||cat==='reductionSum'){
-    var dbE={};arr.forEach(function(r){if(r&&r[keyF])dbE[r[keyF]]=r;});
+  /* 电费台账：月份唯一，导入同样按「月份」覆盖更新，避免同一个月出现两行（重复月份） */
+  if(cat==='water'||cat==='reductionSum'||cat==='electric'){
+    var dbE={};arr.forEach(function(r){if(r&&r[keyF]){if(cat==='electric')r[keyF]=normMonth(r[keyF]);dbE[r[keyF]]=r;}});
     var added=0,updated=0;
     recs.forEach(function(rec){
       if(!rec[keyF])return;
+      if(cat==='electric')rec[keyF]=normMonth(rec[keyF]);
       var ex=dbE[rec[keyF]];
-      if(ex){for(var f in rec){if(rec[f]!=null&&rec[f]!=='')ex[f]=rec[f];}updated++;}
+      if(ex){for(var f in rec){if(rec[f]!=null&&rec[f]!=='')ex[f]=rec[f];}ex.updatedAt=Date.now();updated++;}
       else{rec.id='L'+Date.now()+Math.random().toString(36).slice(2,6);rec.updatedAt=Date.now();arr.push(rec);dbE[rec[keyF]]=rec;added++;}
     });
     return {added:added,updated:updated,ignored:0};
