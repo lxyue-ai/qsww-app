@@ -3585,11 +3585,17 @@ function normMonth(v){
   if(m3)return new Date().getFullYear()+'-'+('0'+m3[1]).slice(-2);
   return s;
 }
-/* 月份类台账的分组键：电费/减排汇总 = 月份；药剂库存 = 月份 + 药剂名 */
+/* 月份类台账的分组键：电费/减排汇总 = 月份；药剂库存 = 月份 + 药剂名
+   （月份或药剂名为空时退回按 id 分组，绝不把两条无关记录并成一条） */
 function monthLedgerKey(cat,r){
   if(!r)return '';
-  if(cat==='chemStock')return normMonth(r.month)+'\u0001'+(''+(r.item==null?'':r.item)).trim();
-  return normMonth(r.month);
+  if(cat==='chemStock'){
+    var it=(''+(r.item==null?'':r.item)).trim(),mm=normMonth(r.month);
+    if(!mm||!it)return 'id:'+(r.id||'');
+    return mm+'\u0001'+it;
+  }
+  var m=normMonth(r.month);
+  return m||('id:'+(r.id||''));
 }
 /* 业务字段里有几个是「有值」的（用来判断同月两条记录哪条数据更全） */
 function filledCount(r,flds){
@@ -3650,7 +3656,7 @@ function natKeyOf(lk,r){
      净重/车牌/备注等常改字段一律不进键，改值不会产生重复。 */
   if(lk==='transfer'||lk==='sludge')return null;
   if(lk==='reductionSum'||lk==='electric'){if(r.month)return 'm:'+normMonth(r.month);} /* 一个月一条：同月跨设备自动合并，不再出现重复月份 */
-  if(lk==='chemStock'){if(r.month)return 'm:'+normMonth(r.month)+'\u0001'+(''+(r.item==null?'':r.item)).trim();} /* 药剂库存：同月同药剂才算一条 */
+  if(lk==='chemStock'){var _it=(''+(r.item==null?'':r.item)).trim();if(r.month&&_it)return 'm:'+normMonth(r.month)+'\u0001'+_it;} /* 药剂库存：同月同药剂才算一条（缺药剂名则不按月份压缩，走 id） */
   if(r.date)return 'd:'+r.date; /* 其余台账（水量/生产/药剂等）一天一条 */
   return null;
 }
