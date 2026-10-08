@@ -1936,7 +1936,7 @@ function sludgeCalcByOutflow(){
   for(var d=1;d<=dim;d++){var ds=ym+'-'+('0'+d).slice(-2);var w=DB.ledgers.water.find(function(r){return r.date===ds;});var o=w?num(w.outflow):0;outs[ds]=o;if(o>0){tot+=o;days.push(ds);}}
   if(!days.length){toast('本月水量台账无出水量数据，无法按比例分摊；请用「平均反推」');return;}
   var alloc={},used=0;
-  days.forEach(function(ds,i){var share=(i===days.length-1)?Math.round((plateTarget-used)*100)/100:Math.round(plateTarget*outs[ds]/tot*100)/100;alloc[ds]=share;used+=share;});
+  days.forEach(function(ds,i){var share=(i===days.length-1)?Math.round((plateTarget-used)*10)/10:Math.round(plateTarget*outs[ds]/tot*10)/10;alloc[ds]=share;used+=share;});
   var added=0;
   days.forEach(function(ds){
     var rec=DB.ledgers.sludge.find(function(r){return r.date===ds;});
@@ -1971,7 +1971,7 @@ function sludgeCalcAvg(){
   for(var d=1;d<=dim;d++){var ds=ym+'-'+('0'+d).slice(-2);var rec=DB.ledgers.sludge.find(function(r){return r.date===ds;});if(rec)standSum+=num(rec.standby);}
   var plateTarget=Math.round((b.plate-standSum)*1000)/1000;
   if(plateTarget<=0){toast('本月总泥饼量已≤ 已填待机产泥量，无需再分摊板框产泥量');return;}
-  var avg=Math.round(plateTarget/dim*100)/100;
+  var avg=Math.round(plateTarget/dim*10)/10;
   var added=0;
   for(var d=1;d<=dim;d++){
     var ds=ym+'-'+('0'+d).slice(-2);
