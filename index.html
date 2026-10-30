@@ -1014,7 +1014,8 @@ function monHourCell(v){
   if(v==null)return null;
   if(v instanceof Date&&!isNaN(v))return {date:v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0'),h:v.getHours()};
   var s=(''+v).trim();
-  var m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})\s+(\d{1,2})(?::\d{2})?(?::\d{2})?$/);
+  // 兼容两种时刻写法：旧导出 "2026-10-29 23:00(:00)" 与监测系统新导出 "2026-10-29 23~24时"（区间表示整点）
+  var m=s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})\s+(\d{1,2})(?:[:~]\d{1,2}时?)?(?::\d{2})*$/);
   if(m)return {date:m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0'),h:+m[4]};
   return null;
 }
