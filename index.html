@@ -3885,8 +3885,54 @@ function bufToB64(buf){var bytes=new Uint8Array(buf);var bin='';for(var i=0;i<by
 function b64ToBuf(b64){var bin=atob(b64);var bytes=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return bytes.buffer;}
 function platReadBuf(file){return new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.onerror=function(){rej(new Error('读取失败'));};fr.readAsArrayBuffer(file);});}
 function platToNum(v){if(v==null||v==='')return null;if(typeof v==='number')return v;var s=(''+v).replace(/,/g,'').trim();if(s===''||s==='--'||s==='—'||s==='-'||s==='ND'||s==='nd')return null;var n=Number(s);return isNaN(n)?null:n;}
-function platHour(v){if(v==null)return null;if(typeof v==='number'){var d=new Date(Math.round((v-25569)*86400)*1000);return d.getUTCHours();}if(v instanceof Date)return v.getHours();var s=(''+v).trim();var m=s.match(/(\d{1,2})\s*$/);if(m)return parseInt(m[1],10);return null;}
-function platParse(XLSX,buf,cols){var wb=XLSX.read(buf,{type:'array',raw:true});var ws=wb.Sheets[wb.SheetNames[0]];var rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});var data={};for(var r=0;r<rows.length;r++){var row=rows[r];if(!row)continue;var hh=platHour(row[0]);if(hh==null)continue;var rec={};for(var k in cols)rec[k]=platToNum(row[cols[k]]);data[hh]=rec;}return data;}
+function platHour(v){if(v==null)return null;if(typeof v==='number'){var d=new Date(Math.round((v-25569)*86400)*1000);return d.getUTCHours();}if(v instanceof Date)return v.getHours();var s=(''+v).trim();var m=s.match(/(\d{1,2})\s*[~～\-—至]\s*\d{1,2}\s*时/);if(m)return parseInt(m[1],10);var m2=s.match(/(\d{1,2})\s*[:：]\d{2}(?::\d{2})?\s*$/);if(m2)return parseInt(m2[1],10);var m3=s.match(/(\d{1,2})\s*时?\s*$/);if(m3)return parseInt(m3[1],10);return null;}
+function findPlatCols(rows){
+  var h=-1;
+  for(var r=0;r<rows.length;r++){var row=rows[r];if(!row)continue;for(var j=0;j<row.length;j++){if(row[j]!=null&&(''+row[j]).indexOf('监测时间')>=0){h=r;break;}}if(h>=0)break;}
+  if(h<0)return null;
+  var h2=h+1;
+  if(rows[h2]){var hasVal=rows[h2].some(function(c){return c!=null&&(''+c).indexOf('监测值')>=0;});if(!hasVal&&rows[h+2]&&rows[h+2].some(function(c){return c!=null&&(''+c).indexOf('监测值')>=0;}))h2=h+2;}
+  var cols={};
+  for(var j=0;j<rows[h].length;j++){
+    var n='';if(rows[h][j]!=null)n+=(''+rows[h][j]);if(rows[h2][j]!=null)n+=' '+((''+rows[h2][j]));
+    if(n.indexOf('累计流量')>=0)cols.flow=j;
+    if(n.indexOf('化学需氧量')>=0)cols.cod=j;
+    if(n.indexOf('氨氮')>=0)cols.nh3=j;
+    if(n.indexOf('总氮')>=0)cols.tn=j;
+    if(n.indexOf('总磷')>=0)cols.tp=j;
+    if(n.indexOf('水温')>=0)cols.temp=j;
+  }
+  var marks=[];
+  for(var j2=0;j2<(rows[h2]?rows[h2].length:0);j2++){if(rows[h2][j2]!=null&&(''+rows[h2][j2]).indexOf('设备标记')>=0)marks.push(j2);}
+  cols._marks=marks;
+  return cols;
+}
+function nearestMark(marks,j){var best=null;for(var i=0;i<marks.length;i++){if(marks[i]>j&&(best==null||marks[i]<best))best=marks[i];}return best;}
+function platParse(XLSX,buf,colsHint){
+  var wb=XLSX.read(buf,{type:'array',raw:true});
+  var ws=wb.Sheets[wb.SheetNames[0]];
+  var rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  var cols=findPlatCols(rows);
+  if(!cols)cols=colsHint||{flow:2,cod:5,nh3:9,tn:null,tp:null,temp:null};
+  var marks=cols._marks||[];
+  var data={};
+  for(var r=0;r<rows.length;r++){
+    var row=rows[r];
+    if(!row)continue;
+    var hh=platHour(row[0]);
+    if(hh==null)continue;
+    var rec={};
+    ['flow','cod','nh3','tn','tp','temp'].forEach(function(p){
+      var ci=cols[p];if(ci==null)return;
+      var val=platToNum(row[ci]);
+      var mk=nearestMark(marks,ci);
+      if(mk!=null){var mv=(row[mk]==null?'':(''+row[mk]).trim());if(mv&&mv!=='数据有效')val=null;}
+      rec[p]=val;
+    });
+    data[hh]=rec;
+  }
+  return data;
+}
 function platMeta(xr){var pt,proj;if(xr<=12){pt='in';proj='nh3';}else if(xr<=24){pt='in';proj='cod';}else if(xr<=36){pt='out';proj='nh3';}else if(xr<=48){pt='out';proj='cod';}else if(xr<=60){pt='out';proj='tn';}else{pt='out';proj='tp';}return{pt:pt,proj:proj,hour:((xr-1)%12)*2};}
 function platColL(n){var s='';n++;while(n>0){var m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;}
 function platSetNum(ws,exRow,c,val){ws[platColL(c)+exRow]={t:'n',v:val};}
