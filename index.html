@@ -491,6 +491,7 @@ table.tb tbody tr:hover{background:var(--blue-xl)}
             <option value="reduction">减排（设备运行时间）报表</option>
             <option value="sched">运行调度月报（自动生成）</option>
             <option value="redRep">减排台账月报（自动生成）</option>
+            <option value="redStat">减排量统计表（月/季/年）</option>
             <option value="selfCheck">厂内自检报告</option>
             <option value="monitor">在线监测日均值表</option>
           </select></div>
@@ -2566,6 +2567,7 @@ function renderStats(){
   if(type==='chlorine'){renderChlorineReport(ym,mode);return;}
   if(type==='sched'){renderSched(ym,mode);return;}
   if(type==='redRep'){renderRedRep(ym,mode);return;}
+  if(type==='redStat'){renderRedStat(ym,mode);return;}
   if(type==='selfCheck'){renderSelfCheck(ym,mode);return;}
   if(type==='monitor'){dailyAvgMonth=ym;renderDailyAvg('statsBody',mode,ym);return;}
   if(type==='chemical'){renderChemReport(ym,mode);return;}
@@ -2960,6 +2962,109 @@ function exportReductionCSV(ym,mode){
   var months=monthsInPeriod(mode,ym).map(reductionAggMonth),csv='﻿'+periodName(mode,ym)+' 减排（设备运行时间）报表（汇总）\n月份,鼓风机(h),提升泵(h),污泥脱水机(h),滗水器(h)\n';
   months.forEach(function(r){csv+=r.y+'年'+r.m+'月,'+fve(r.b)+','+fve(r.pu)+','+fve(r.de)+','+fve(r.dec)+'\n';});
   download(csv,'减排运行报表_'+periodSlug(mode,ym)+'.csv','text/csv');
+}
+/* ================= 减排量统计表（月/季/年，按官方格式） =================
+   表头按《运行情况与减排量统计表》：月份/累计进水量/累计出水量/污泥量/日均处理量/
+   进出口COD浓度/进口COD产生量/出口COD排放量/COD减排量/进出口氨氮浓度/进出口氨氮产生·排放量/氨氮减排量/
+   出口总氮/出口总磷/污泥处置量(干化后含水率40%)/用电量。
+   减排量公式（用户指定）：减排量(t)=（进水浓度−出水浓度）×处理水量÷1000000；处理水量=累计出水量(m³)。
+   数据严格取自工作台历史台账：水量←水量台账；污泥量←产泥台账(板框+待机)；处置量←污泥转运净重；
+   浓度←在线监测(DB.monitor)月均值；用电量←电费台账(老厂+新厂)。 */
+function redStatMonth(mo){
+  var y=+mo.slice(0,4),m=+mo.slice(5,7),dim=new Date(y,m,0).getDate();
+  var inW=0,outW=0,sludge=0,disposal=0,prodPow=0;
+  var acc={inCod:[],cod:[],inNh3:[],nh3:[],tn:[],tp:[]};
+  for(var d=1;d<=dim;d++){
+    var ds=mo+'-'+String(d).padStart(2,'0');
+    var w=(DB.ledgers.water||[]).find(function(r){return r.date===ds;});
+    if(w){inW+=num(w.inflow);outW+=num(w.outflow);}
+    var sl=(DB.ledgers.sludge||[]).find(function(r){return r.date===ds;});
+    if(sl)sludge+=num(sl.plate)+num(sl.standby);
+    (DB.ledgers.transfer||[]).forEach(function(r){if(r.date===ds)disposal+=num(r.net);});
+    var p=(DB.ledgers.production||[]).find(function(r){return r.date===ds;});
+    if(p)prodPow+=num(p.power);
+    var mon=DB.monitor?DB.monitor[ds]:null;
+    if(mon){
+      if(mon.inCod!=null&&mon.inCod!=='')acc.inCod.push(num(mon.inCod));
+      if(mon.cod!=null&&mon.cod!=='')acc.cod.push(num(mon.cod));
+      if(mon.inNh3!=null&&mon.inNh3!=='')acc.inNh3.push(num(mon.inNh3));
+      if(mon.nh3!=null&&mon.nh3!=='')acc.nh3.push(num(mon.nh3));
+      if(mon.tn!=null&&mon.tn!=='')acc.tn.push(num(mon.tn));
+      if(mon.tp!=null&&mon.tp!=='')acc.tp.push(num(mon.tp));
+    }
+  }
+  /* 用电量：优先电费台账该月老厂+新厂；缺则回退生产量台账用电合计 */
+  var el=(DB.ledgers.electric||[]).find(function(r){return (r.month||'')===mo;});
+  var kwh=el?(num(el.oldKwh)+num(el.newKwh)):(prodPow||null);
+  function avg(a){return a.length?Math.round(a.reduce(function(x,y){return x+y;},0)/a.length*100)/100:null;}
+  var inCod=avg(acc.inCod),cod=avg(acc.cod),inNh3=avg(acc.inNh3),nh3=avg(acc.nh3),tn=avg(acc.tn),tp=avg(acc.tp);
+  var treat=outW;                       /* 处理水量 = 累计出水量(m³) */
+  var dailyAvg=dim?Math.round(outW/dim*100)/100:null;
+  function g(cin,cout){                 /* 产生量/排放量/减排量（吨） */
+    var prod=(cin!=null)?Math.round(cin*treat/1000000*100)/100:null;
+    var dis =(cout!=null)?Math.round(cout*treat/1000000*100)/100:null;
+    var red =(cin!=null&&cout!=null)?Math.round((cin-cout)*treat/1000000*100)/100:null;
+    return {prod:prod,dis:dis,red:red};
+  }
+  var cg=g(inCod,cod),ng=g(inNh3,nh3);
+  return {y:y,m:m,inW:inW,outW:outW,sludge:sludge,dailyAvg:dailyAvg,
+    inCod:inCod,cod:cod,codProd:cg.prod,codDis:cg.dis,codRed:cg.red,
+    inNh3:inNh3,nh3:nh3,nh3Prod:ng.prod,nh3Dis:ng.dis,nh3Red:ng.red,
+    tn:tn,tp:tp,disposal:disposal,kwh:kwh};
+}
+/* 合计/平均页脚：累加列求和；日均处理量与各浓度列取各月简单平均（与官方表口径一致） */
+function redStatFooter(list){
+  function sum(k){var s=0,n=0;list.forEach(function(o){if(o[k]!=null){s+=o[k];n++;}});return n?Math.round(s*100)/100:null;}
+  function avg(k){var s=0,n=0;list.forEach(function(o){if(o[k]!=null){s+=o[k];n++;}});return n?Math.round(s/n*100)/100:null;}
+  return {m:'合计/平均',footer:true,
+    inW:sum('inW'),outW:sum('outW'),sludge:sum('sludge'),dailyAvg:avg('dailyAvg'),
+    inCod:avg('inCod'),cod:avg('cod'),codProd:sum('codProd'),codDis:sum('codDis'),codRed:sum('codRed'),
+    inNh3:avg('inNh3'),nh3:avg('nh3'),nh3Prod:sum('nh3Prod'),nh3Dis:sum('nh3Dis'),nh3Red:sum('nh3Red'),
+    tn:avg('tn'),tp:avg('tp'),disposal:sum('disposal'),kwh:sum('kwh')};
+}
+function redStatRowHtml(o){
+  var name=o.footer?o.m:(o.m+'月');
+  var cls=o.footer?' style="font-weight:700;background:var(--blue-xl)"':'';
+  return '<tr'+cls+'><td>'+name+'</td><td>'+fe(o.inW)+'</td><td>'+fe(o.outW)+'</td><td>'+fe(o.sludge)+'</td><td>'+fe(o.dailyAvg)+'</td>'
+    +'<td>'+fe(o.inCod)+'</td><td>'+fe(o.cod)+'</td><td>'+fe(o.codProd)+'</td><td>'+fe(o.codDis)+'</td><td>'+fe(o.codRed)+'</td>'
+    +'<td>'+fe(o.inNh3)+'</td><td>'+fe(o.nh3)+'</td><td>'+fe(o.nh3Prod)+'</td><td>'+fe(o.nh3Dis)+'</td><td>'+fe(o.nh3Red)+'</td>'
+    +'<td>'+fe(o.tn)+'</td><td>'+fe(o.tp)+'</td><td>'+fe(o.disposal)+'</td><td>'+fe(o.kwh)+'</td></tr>';
+}
+function renderRedStat(ym,mode){
+  mode=mode||'month';
+  var list=monthsInPeriod(mode,ym).map(redStatMonth),pn=periodName(mode,ym);
+  var has=list.some(function(o){return o.inW>0||o.outW>0||o.inCod!=null||o.cod!=null;});
+  var h='<h2 style="margin-bottom:6px;text-align:center">清水县污水处理厂 '+pn+'运行情况与减排量统计表</h2>';
+  h+='<div class="section-note">数据严格取自工作台历史台账：进/出水量=水量台账；污泥量=产泥台账(板框+待机)；污泥处置量=污泥转运净重；进/出口浓度=在线监测月均值；用电量=电费台账(老厂+新厂)。减排量(t)=（进水浓度−出水浓度）×处理水量(累计出水量m³)÷1000000。日均处理量=累计出水量÷当月天数。</div>';
+  if(!has){h+='<div class="muted">该期间暂无数据，请先在「台账中心」录入水量/产泥/转运台账并上传监测数据。</div>';document.getElementById('statsBody').innerHTML=h;return;}
+  h+='<div class="tbwrap"><table class="tb" style="white-space:nowrap"><thead><tr>'
+    +'<th>月份</th><th>累计进水量(吨)</th><th>累计出水量(吨)</th><th>污泥量(吨)</th><th>日均处理量(m³/日)</th>'
+    +'<th>进口COD浓度(mg/l)</th><th>出口COD浓度(mg/l)</th><th>进口COD产生量(吨)</th><th>出口COD排放量(吨)</th><th>COD减排量(吨)</th>'
+    +'<th>进口氨氮浓度(mg/l)</th><th>出口氨氮浓度(mg/l)</th><th>进口氨氮产生量(吨)</th><th>出口氨氮排放量(吨)</th><th>氨氮减排量(吨)</th>'
+    +'<th>出口总氮浓度(mg/l)</th><th>出口总磷浓度(mg/l)</th><th>污泥处置量(吨)(干化后含水率40%)</th><th>用电量(KWh)</th>'
+    +'</tr></thead><tbody>';
+  list.forEach(function(o){h+=redStatRowHtml(o);});
+  if(list.length>1)h+=redStatRowHtml(redStatFooter(list));
+  h+='</tbody></table></div>';
+  /* 备注：城镇生活污水集中处理率 = 累计出水量 ÷ (累计进水量 − 污泥量) */
+  var tIn=0,tOut=0,tSl=0;list.forEach(function(o){tIn+=o.inW;tOut+=o.outW;tSl+=o.sludge;});
+  var denom=tIn-tSl,rate=(denom>0)?Math.round(tOut/denom*10000)/100:null;
+  h+='<div class="section-note" style="margin-top:8px"><b>备注：</b>城镇生活污水集中处理率 =（累计出水量 ÷（累计进水量 − 污泥、反冲洗回水量））。'+pn+'城镇生活污水集中处理率为 <b>'+(rate!=null?rate+'%':'-')+'</b>。</div>';
+  h+='<div class="row" style="margin-top:12px"><button class="btn ghost" onclick="exportRedStatCSV(\''+mode+'\',\''+ym+'\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 CSV</button><button class="btn ghost" onclick="exportStatsExcel(\'statsBody\')"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16"/></svg>导出 Excel</button><button class="btn ghost" onclick="exportStatsWord(\'statsBody\')"><svg class="ic" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>导出 Word（可打印盖章）</button></div>';
+  document.getElementById('statsBody').innerHTML=h;
+}
+function exportRedStatCSV(mode,ym){
+  mode=mode||'month';ym=ym||statsRef();
+  var list=monthsInPeriod(mode,ym).map(redStatMonth),pn=periodName(mode,ym);
+  var csv='﻿清水县污水处理厂'+pn+'运行情况与减排量统计表\n';
+  csv+='月份,累计进水量(吨),累计出水量(吨),污泥量(吨),日均处理量(m³/日),进口COD浓度(mg/l),出口COD浓度(mg/l),进口COD产生量(吨),出口COD排放量(吨),COD减排量(吨),进口氨氮浓度(mg/l),出口氨氮浓度(mg/l),进口氨氮产生量(吨),出口氨氮排放量(吨),氨氮减排量(吨),出口总氮浓度(mg/l),出口总磷浓度(mg/l),污泥处置量(吨)(干化后含水率40%),用电量(KWh)\n';
+  function row(o){var name=o.footer?o.m:(o.m+'月');return name+','+fve(o.inW)+','+fve(o.outW)+','+fve(o.sludge)+','+fve(o.dailyAvg)+','+fve(o.inCod)+','+fve(o.cod)+','+fve(o.codProd)+','+fve(o.codDis)+','+fve(o.codRed)+','+fve(o.inNh3)+','+fve(o.nh3)+','+fve(o.nh3Prod)+','+fve(o.nh3Dis)+','+fve(o.nh3Red)+','+fve(o.tn)+','+fve(o.tp)+','+fve(o.disposal)+','+fve(o.kwh)+'\n';}
+  list.forEach(function(o){csv+=row(o);});
+  if(list.length>1)csv+=row(redStatFooter(list));
+  var tIn=0,tOut=0,tSl=0;list.forEach(function(o){tIn+=o.inW;tOut+=o.outW;tSl+=o.sludge;});
+  var denom=tIn-tSl,rate=(denom>0)?Math.round(tOut/denom*10000)/100:null;
+  csv+='备注,城镇生活污水集中处理率=(累计出水量/(累计进水量-污泥、反冲洗回水量))；'+pn+'为 '+(rate!=null?rate+'%':'-')+'\n';
+  download(csv,'减排量统计表_'+periodSlug(mode,ym)+'.csv','text/csv');
 }
 /* ================= 运行调度月报（自动生成） ================= */
 function schedAggMonth(mo){
