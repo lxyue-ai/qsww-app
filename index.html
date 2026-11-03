@@ -1877,10 +1877,6 @@ function openPdf(dataURL){
   }).catch(function(){toast('无法打开 PDF');});
 }
 /* 附件缩略图：PDF 显示徽标，图片显示缩略图 */
-function fileThumb(f,onview){
-  if(f.pdf)return '<div class="pdfthumb" onclick="'+onview+'"><svg class="ic" viewBox="0 0 24 24" style="width:32px;height:32px"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg><span>PDF</span></div>';
-  return '<img src="'+f.data+'" onclick="'+onview+'">';
-}
 function attachImg(cat,id){
   var inp=document.createElement('input');inp.type='file';inp.accept='image/*,.pdf,application/pdf';
   inp.onchange=function(){
@@ -2247,39 +2243,6 @@ function renderChem(){
   renderGenericInto(chemSub==='day'?'chemical':'chemStock','chemSubBody');
 }
 
-/* ================= 监测报告 ================= */
-var MR_CATS=['每月水质监测','污泥监测报告','比对报告','其他监测报告'];
-var MR_LINK={'每月水质监测':['查看水量台账','water'],'污泥监测报告':['查看污泥台账','sludge'],'比对报告':['前往每日上报','__report'],'其他监测报告':['查看台账中心','water']};
-function uploadMReport(inp){
-  var cat=document.getElementById('mr_cat').value;
-  var month=document.getElementById('mr_month').value||thisMonth();
-  var note=document.getElementById('mr_note').value.trim();
-  var files=Array.prototype.slice.call(inp.files),done=0;
-  files.forEach(function(file){
-    fileToData(file,function(res){
-      var ext=res.pdf?'.pdf':'.jpg';
-      DB.files.push({id:uid(),cat:cat,note:(month+' ')+(note||file.name),date:todayStr(),data:res.data,pdf:res.pdf});
-      saveToPC(cat,(month+'_'+(note||file.name)).replace(/[\\/:*?"<>|]/g,'_')+ext,res.data);
-      done++;if(done===files.length){save();renderMReport();toast('已上传 '+done+' 份报告'+(pcDir?'，已同步存入电脑文件夹':''));inp.value='';document.getElementById('mr_note').value='';}
-    });
-  });
-}
-function renderMReport(){
-  var tabs='';MR_CATS.forEach(function(c){
-    var n=DB.files.filter(function(f){return f.cat===c;}).length;
-    tabs+='<button class="tab'+(c===curMrCat?' active':'')+'" onclick="curMrCat=\''+c+'\';renderMReport()">'+c+'('+n+')</button>';
-  });
-  document.getElementById('mrTabs').innerHTML=tabs;
-  var list=DB.files.filter(function(f){return f.cat===curMrCat;});
-  var link=MR_LINK[curMrCat];
-  var h='<div class="row" style="margin-bottom:10px"><button class="btn ghost sm" onclick="'+(link[1]==='__report'?"go('report')":"go('ledger','"+link[1]+"')")+'">'+link[0]+' →</button></div>';
-  if(!list.length)h+='<div class="muted">该分类暂无报告</div>';
-  else{h+='<div class="file-grid">';list.forEach(function(f){
-    h+='<div class="file-cell">'+fileThumb(f,"viewFile('"+f.id+"')")+'<div class="fc-body">'+f.note+'<br>'+f.date+'</div><div class="fc-acts"><button onclick="dlFile(\''+f.id+'\')">下载</button><button onclick="delFileMr(\''+f.id+'\')">删除</button></div></div>';
-  });h+='</div>';}
-  document.getElementById('mrBody').innerHTML=h;
-}
-function delFileMr(id){DB.files=DB.files.filter(function(x){return x.id!==id;});save();renderMReport();toast('已删除');}
 
 /* ================= 报表中心 ================= */
 function inPeriod(ds,mode,ym){
@@ -3488,45 +3451,6 @@ function exportStatsCSV(){
   download(csv,periodName(mode,ym)+'报表.csv','text/csv');
 }
 
-/* ================= 资料库 ================= */
-var FILE_CATS=['异常报告','溢流报告','污泥资料','检测报告','电费发票','药剂票据','其他资料'];
-function uploadFiles(inp){
-  var cat=document.getElementById('f_cat').value,note=document.getElementById('f_note').value.trim();
-  var exist=DB.files.filter(function(f){return f.cat===cat;}).length;
-  var files=Array.prototype.slice.call(inp.files);
-  if(exist+files.length>30){toast('该分类最多存 30 张，请先删除旧文件');inp.value='';return;}
-  var done=0;
-  files.forEach(function(file){
-    fileToData(file,function(res){
-      var ext=res.pdf?'.pdf':'.jpg';
-      DB.files.push({id:uid(),cat:cat,note:note||file.name,date:todayStr(),data:res.data,pdf:res.pdf});
-      saveToPC(cat,todayStr()+'_'+(note||file.name).replace(/[\\/:*?"<>|]/g,'_')+ext,res.data);
-      done++;if(done===files.length){save();renderFiles();renderToday();toast('已上传 '+done+' 张到「'+cat+'」'+(pcDir?'，已同步存入电脑文件夹':''));inp.value='';document.getElementById('f_note').value='';}
-    });
-  });
-}
-function renderFiles(){
-  var sel=document.getElementById('f_cat');
-  if(!sel.options.length)sel.innerHTML=FILE_CATS.map(function(c){return '<option>'+c+'</option>';}).join('');
-  var tabs='';FILE_CATS.forEach(function(c){
-    var n=DB.files.filter(function(f){return f.cat===c;}).length;
-    tabs+='<button class="tab'+(c===curFileCat?' active':'')+'" onclick="curFileCat=\''+c+'\';renderFiles()">'+c+'('+n+')</button>';
-  });
-  document.getElementById('fileTabs').innerHTML=tabs;
-  var list=DB.files.filter(function(f){return f.cat===curFileCat;});
-  var h='';
-  if(!list.length)h='<div class="muted">该分类暂无文件</div>';
-  else{h='<div class="file-grid">';list.forEach(function(f){
-    h+='<div class="file-cell">'+fileThumb(f,"viewFile('"+f.id+"')")+'<div class="fc-body">'+f.note+'<br>'+f.date+'</div><div class="fc-acts"><button onclick="dlFile(\''+f.id+'\')">下载</button><button onclick="delFile(\''+f.id+'\')">删除</button></div></div>';
-  });h+='</div>';}
-  document.getElementById('fileBody').innerHTML=h;
-}
-function viewFile(id){var f=DB.files.find(function(x){return x.id===id;});if(!f)return;
-  if(f.pdf){openPdf(f.data);return;}
-  document.getElementById('viewerImg').src=f.data;document.getElementById('viewer').classList.add('show');}
-function dlFile(id){var f=DB.files.find(function(x){return x.id===id;});if(!f)return;
-  var a=document.createElement('a');a.href=f.data;a.download=(f.note||f.cat)+(f.pdf?'.pdf':'.jpg');a.click();toast('已下载，可保存到电脑对应文件夹');}
-function delFile(id){DB.files=DB.files.filter(function(x){return x.id!==id;});save();renderFiles();toast('已删除');}
 
 /* ================= 搜索 / 计算 ================= */
 function doSearch(q){
