@@ -3550,8 +3550,34 @@ function exportRedSumDoc(id){
   exportWord('减排情况月汇总表_'+ym+'.doc',body);
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function exportWord(filename,bodyHtml){
-  var html='﻿<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]--><style>@page Section1{size:21.0cm 29.7cm;margin:2.54cm 3.18cm 2.54cm 2.06cm;mso-page-orientation:portrait;}div.Section1{page:Section1;}body{font-family:SimSun,serif;font-size:12pt;line-height:1.6;}table{border-collapse:collapse;width:100%;mso-table-layout-alt:fixed;}td,th{border:1pt solid #000;vertical-align:top;padding:4pt 6pt;font-family:SimSun,serif;font-size:12pt;}p{margin:0 0 6pt;font-family:SimSun,serif;font-size:12pt;}</style></head><body><div class="Section1">'+bodyHtml+'</div></body></html>';
+function exportWord(filename,bodyHtml,opts){
+  opts=opts||{};
+  /* 自动判断宽表→横向，最大化单页容纳率（列数>11 视为宽表） */
+  var landscape=opts.landscape;
+  if(landscape==null){
+    var mx=0,tre=/<table[\s>]/gi,tm;
+    while((tm=tre.exec(bodyHtml))){
+      var rest=bodyHtml.slice(tm.index),rm=rest.match(/<tr[\s>][\s\S]*?<\/tr>/i);
+      if(rm){
+        var row=rm[0],cells=(row.match(/<t[hd][\s>]/gi)||[]).length,cs,cre=/colspan\s*=\s*["']?\s*(\d+)/gi;
+        while((cs=cre.exec(row)))cells+=(parseInt(cs[1],10)-1);
+        if(cells>mx)mx=cells;
+      }
+    }
+    landscape=mx>11;
+  }
+  var sz=landscape?'29.7cm 21.0cm':'21.0cm 29.7cm',ori=landscape?'landscape':'portrait';
+  var css='@page Section1{size:'+sz+';margin:1.2cm 1.0cm 1.2cm 1.0cm;mso-page-orientation:'+ori+';}'
+    +'div.Section1{page:Section1;}'
+    +'body{font-family:SimSun,serif;font-size:10pt;line-height:1.2;}'
+    +'table{border-collapse:collapse;width:100%;mso-table-layout-alt:fixed;font-size:9pt;}'
+    +'td,th{border:1pt solid #000;vertical-align:top;padding:1.5pt 2.5pt;font-family:SimSun,serif;font-size:9pt;}'
+    +'h2{font-size:13pt;margin:4pt 0 3pt;text-align:center;font-family:SimHei,SimSun,sans-serif;font-weight:bold;}'
+    +'h3{font-size:11pt;margin:5pt 0 2pt;font-family:SimHei,SimSun,sans-serif;}'
+    +'p{margin:0 0 3pt;font-family:SimSun,serif;font-size:10pt;}'
+    +'.section-note{font-size:8.5pt;color:#444;line-height:1.25;margin:2pt 0 4pt;}'
+    +'img{max-width:100%;}';
+  var html='﻿<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]--><style>'+css+'</style></head><body><div class="Section1">'+bodyHtml+'</div></body></html>';
   download(html,filename,'application/msword');
   toast('已导出 Word 文件');
 }
