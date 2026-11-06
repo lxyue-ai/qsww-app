@@ -1061,12 +1061,13 @@ function monParseExcel(XLSX,buf){
     rec.hours++;
     function grab(key){
       var mc=cols[key];if(!mc||mc.val<0)return;
-      if(mc.flag>=0&&!monFlagOk(row[mc.flag]))return;
+      /* 不再按“设备标记=数据有效”过滤：平台导出的「校准/故障」时段同样有有效读数，
+         过滤会把整点数据丢掉（每日上报/日均值同样受影响）。空值由 platToNum 统一返回 null */
       var v=platToNum(row[mc.val]);if(v!=null)rec[key].push(v);
     }
     grab('flow');grab('cod');grab('nh3');grab('tn');grab('tp');
     var pm=cols.ph;
-    if(pm&&pm.val>=0&&(pm.flag<0||monFlagOk(row[pm.flag]))){
+    if(pm&&pm.val>=0){
       var v1=platToNum(row[pm.val]),v2=platToNum(row[pm.val+1]);
       var pa=(v1!=null&&v1>0&&v1<14)?v1:null, pb=(v2!=null&&v2>0&&v2<14)?v2:null;
       if(pa!=null&&pb!=null)rec.ph.push((pa+pb)/2);
@@ -4174,29 +4175,40 @@ function platReadBuf(file){return new Promise(function(res,rej){var fr=new FileR
 function platToNum(v){if(v==null||v==='')return null;if(typeof v==='number')return v;var s=(''+v).replace(/,/g,'').trim();if(s===''||s==='--'||s==='—'||s==='-'||s==='ND'||s==='nd')return null;var n=Number(s);return isNaN(n)?null:n;}
 function platHour(v){if(v==null)return null;if(typeof v==='number'){var d=new Date(Math.round((v-25569)*86400)*1000);return d.getUTCHours();}if(v instanceof Date)return v.getHours();var s=(''+v).trim();var m=s.match(/(\d{1,2})\s*[~～\-—至]\s*\d{1,2}\s*时/);if(m)return parseInt(m[1],10);var m2=s.match(/(\d{1,2})\s*[:：]\d{2}(?::\d{2})?\s*$/);if(m2)return parseInt(m2[1],10);var m3=s.match(/(\d{1,2})\s*时?\s*$/);if(m3)return parseInt(m3[1],10);return null;}
 function findPlatCols(rows){
-  /* 先在表头中定位“时间”列所在行；兼容“监测时间/监测时刻/时间”等写法 */
+  /* ① 定位“监测时间”表头行（严格匹配，避免误命中第 2 行的“时间：…”说明文字） */
   var h=-1;
-  for(var r=0;r<rows.length;r++){var row=rows[r];if(!row)continue;for(var j=0;j<row.length;j++){var c=row[j]==null?'':(''+row[j]);if(c.indexOf('监测时间')>=0||c.indexOf('监测时刻')>=0||c.indexOf('时间')>=0){h=r;break;}}if(h>=0)break;}
+  for(var r=0;r<rows.length;r++){var row=rows[r];if(!row)continue;for(var j=0;j<row.length;j++){var c=row[j]==null?'':(''+row[j]).trim();if(c.indexOf('监测时间')>=0||c.indexOf('监测时刻')>=0||c==='时间'||c==='时刻'){h=r;break;}}if(h>=0)break;}
   if(h<0)return null;
-  /* 表头往往跨多行：向上取 2 行、向下取 3 行拼成每列的“富名称”，
-     这样无论指标名在“时间”行的上一行还是下一行都能识别到 */
-  var lo=Math.max(0,h-2),hi=Math.min(rows.length-1,h+3);
-  function colName(j){var n=[];for(var k=lo;k<=hi;k++){var row=rows[k];if(row&&row[j]!=null){var t=(''+row[j]).trim();if(t)n.push(t);}}return n.join(' ');}
-  var cols={},maxLen=0;
-  for(var k2=lo;k2<=hi;k2++){if(rows[k2]&&rows[k2].length>maxLen)maxLen=rows[k2].length;}
-  for(var j=0;j<maxLen;j++){
-    var n=colName(j);
-    if(n.indexOf('累计流量')>=0)cols.flow=j;
-    else if(n.indexOf('化学需氧量')>=0||n.toUpperCase().indexOf('COD')>=0)cols.cod=j;
-    else if(n.indexOf('氨氮')>=0)cols.nh3=j;
-    else if(n.indexOf('总氮')>=0)cols.tn=j;
-    else if(n.indexOf('总磷')>=0)cols.tp=j;
-    else if(n.indexOf('水温')>=0)cols.temp=j;
-  }
-  /* 从所有表头行收集“设备标记”列（位置不固定都能找到） */
-  var marks=[];
-  for(var k3=lo;k3<=hi;k3++){var row3=rows[k3];if(!row3)continue;for(var j3=0;j3<row3.length;j3++){if(row3[j3]!=null&&(''+row3[j3]).indexOf('设备标记')>=0)marks.push(j3);}}
-  cols._marks=marks;
+  /* ② 指标标题行：通常在“监测时间”同行或下方 1~3 行（合并单元格左对齐） */
+  function isTitleRow(k){var row=rows[k];if(!row)return false;for(var j=0;j<row.length;j++){var c=row[j]==null?'':(''+row[j]);if(c.indexOf('化学需氧量')>=0||c.indexOf('氨氮')>=0||c.indexOf('总氮')>=0||c.indexOf('总磷')>=0||c.indexOf('水温')>=0||c.indexOf('流量')>=0)return true;}return false;}
+  var ht=h;
+  for(var k=h;k<=Math.min(rows.length-1,h+3);k++){if(isTitleRow(k)){ht=k;break;}}
+  /* ③ 标题行里每个非空单元格 = 一个「指标组」的起点；组区间 = 本起点 → 下一个起点。
+     监测平台导出把指标名做成跨多列的合并单元格，数据列不一定等于标题列，必须按组找子列 */
+  var titleRow=rows[ht]||[],bounds=[];
+  for(var j2=0;j2<titleRow.length;j2++){var t2=titleRow[j2]==null?'':(''+titleRow[j2]).trim();if(!t2)continue;bounds.push({j:j2,name:t2});}
+  bounds.sort(function(a,b){return a.j-b.j;});
+  var maxLen=0;for(var km=0;km<rows.length;km++){if(rows[km]&&rows[km].length>maxLen)maxLen=rows[km].length;}
+  function groupEnd(j){for(var i=0;i<bounds.length;i++){if(bounds[i].j>j)return bounds[i].j;}return maxLen;}
+  /* ④ 子表头名：只取标题行下方 1~3 行，遇到数字（数据行）立即停止，避免把数值当列名 */
+  function subName(j){var ps=[];for(var k3=ht+1;k3<=Math.min(rows.length-1,ht+3);k3++){var rr=rows[k3];if(!rr||rr[j]==null)continue;var t3=(''+rr[j]).trim();if(!t3||t3==='--'||t3==='—')continue;if(/^-*\d+(\.\d+)?$/.test(t3))break;ps.push(t3);}return ps.join(' ');}
+  var KW={flow:['流量'],cod:['化学需氧量','COD'],nh3:['氨氮'],tn:['总氮'],tp:['总磷'],temp:['水温']};
+  var cols={};
+  bounds.forEach(function(bd){
+    var key=null;
+    Object.keys(KW).forEach(function(kk){if(key)return;KW[kk].forEach(function(w){if(!key&&bd.name.toUpperCase().indexOf(w.toUpperCase())>=0)key=kk;});});
+    if(!key||cols[key]!=null)return;
+    var end=groupEnd(bd.j),pick=-1,mark=-1;
+    for(var j4=bd.j;j4<end;j4++){
+      var sn=subName(j4);
+      if(pick<0&&(sn.indexOf('监测值')>=0||sn.indexOf('平均值')>=0))pick=j4;
+      if(mark<0&&sn.indexOf('设备标记')>=0)mark=j4;
+    }
+    cols[key]=(pick>=0?pick:bd.j);          /* 组内找不到“监测值”就退回标题列本身 */
+    cols['mk_'+key]=(mark>=0?mark:null);
+  });
+  /* ⑤ 兜底：标题行没认出来时，全表扫描“累计流量”定位流量列 */
+  if(cols.flow==null){for(var j5=0;j5<maxLen;j5++){if(subName(j5).indexOf('累计流量')>=0){cols.flow=j5;break;}}}
   return cols;
 }
 function nearestMark(marks,j){var best=null;for(var i=0;i<marks.length;i++){if(marks[i]>j&&(best==null||marks[i]<best))best=marks[i];}return best;}
@@ -4205,9 +4217,8 @@ function platParse(XLSX,buf,colsHint){
   var ws=wb.Sheets[wb.SheetNames[0]];
   var rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
   var cols=findPlatCols(rows);
-  if(!cols)cols=colsHint||{flow:2,cod:5,nh3:9,tn:null,tp:null,temp:null};
-  var marks=cols._marks||[];
-  var data={};
+  if(!cols)cols=colsHint||{flow:2,cod:7,nh3:12,tn:17,tp:22};
+  var data={},abn={};
   for(var r=0;r<rows.length;r++){
     var row=rows[r];
     if(!row)continue;
@@ -4217,12 +4228,19 @@ function platParse(XLSX,buf,colsHint){
     ['flow','cod','nh3','tn','tp','temp'].forEach(function(p){
       var ci=cols[p];if(ci==null)return;
       var val=platToNum(row[ci]);
-      var mk=nearestMark(marks,ci);
-      if(mk!=null){var mv=(row[mk]==null?'':(''+row[mk]).trim());if(mv&&mv!=='数据有效')val=null;}
       rec[p]=val;
+      /* 设备标记只做记录、不再丢数：平台导出的「校准/故障/停机」时段数值同样是有效上报值，
+         以前这里只要标记不是“数据有效”就把值置空，导致上报文件成片缺数据 */
+      var mi=cols['mk_'+p];
+      if(mi!=null&&val!=null){
+        var mv=(row[mi]==null?'':(''+row[mi]).trim());
+        if(mv&&mv!=='数据有效'&&mv!=='--'&&mv!=='—')abn[mv]=(abn[mv]||0)+1;
+      }
     });
     data[hh]=rec;
   }
+  /* 非枚举属性，避免影响 Object.keys(data).length 的空数据判断 */
+  try{Object.defineProperty(data,'_abn',{value:abn,enumerable:false});}catch(e){data._abn=abn;}
   return data;
 }
 function platMeta(xr){var pt,proj;if(xr<=12){pt='in';proj='nh3';}else if(xr<=24){pt='in';proj='cod';}else if(xr<=36){pt='out';proj='nh3';}else if(xr<=48){pt='out';proj='cod';}else if(xr<=60){pt='out';proj='tn';}else{pt='out';proj='tp';}return{pt:pt,proj:proj,hour:((xr-1)%12)*2};}
@@ -4240,24 +4258,25 @@ function platGenerate(){
   var date=document.getElementById('platDate').value||todayStr();
   msg.textContent='生成中…';
   loadSheetJS().then(function(XLSX){
-    /* 写死列号仅作最后兜底；正常情况 findPlatCols 会自动识别表头。列号均为 0 起始 */
-    var inD=platParse(XLSX,platInBuf,{flow:1,cod:3,nh3:5});
-    var outD=platParse(XLSX,platOutBuf,{flow:1,cod:3,nh3:5,tn:7,tp:9,temp:11});
+    /* 写死列号仅作最后兜底；正常情况 findPlatCols 会按“指标组”自动识别表头。列号均为 0 起始 */
+    var inD=platParse(XLSX,platInBuf,{flow:2,cod:7,nh3:12,tn:17,tp:22});
+    var outD=platParse(XLSX,platOutBuf,{flow:2,cod:12,nh3:18,tn:24,tp:30,temp:36});
     if(Object.keys(inD).length===0&&Object.keys(outD).length===0){msg.textContent='两份数据均未解析到小时数据，请检查文件格式（表头需含“监测时间”，时间列格式如 2026-10-30 23~24时）。';return;}
     var inTemp=platInTempArr();
     var tpl=XLSX.read(platTplBuf,{type:'array',raw:true});
     var ws=tpl.Sheets[tpl.SheetNames[0]];
-    var filled=0;
+    var filled=0,resFilled=0;
     for(var xr=1;xr<=72;xr++){
       var meta=platMeta(xr);var D=meta.pt==='in'?inD:outD;
-      /* 小时容错：优先取该模板时段的偶数小时，取不到再向相邻 ±1/±2 小时找，避免整行空白 */
-      var rec=null,_c=[meta.hour,meta.hour-1,meta.hour+1,meta.hour-2,meta.hour+2];
-      for(var _i=0;_i<_c.length;_i++){if(D[_c[_i]]!=null){rec=D[_c[_i]];break;}}
+      /* 小时容错：优先取该模板时段有“监测结果”的小时，再退而取有流量的小时，避免整行空白 */
+      var rec=null,_c=[meta.hour,meta.hour-1,meta.hour+1,meta.hour-2,meta.hour+2],_i;
+      for(_i=0;_i<_c.length;_i++){var _r=D[_c[_i]];if(_r&&_r[meta.proj]!=null){rec=_r;break;}}
+      if(!rec){for(_i=0;_i<_c.length;_i++){var _r2=D[_c[_i]];if(_r2&&_r2.flow!=null){rec=_r2;break;}}}
       var exRow=xr+1;
       ws[platColL(8)+exRow]={t:'s',v:date};
       if(rec){
         if(rec.flow!=null){platSetNum(ws,exRow,10,Math.round(rec.flow*1000)/1000);platSetNum(ws,exRow,11,Math.round(rec.flow/625*100*100)/100);}
-        if(rec[meta.proj]!=null)platSetNum(ws,exRow,13,Math.round(rec[meta.proj]*1000)/1000);
+        if(rec[meta.proj]!=null){platSetNum(ws,exRow,13,Math.round(rec[meta.proj]*1000)/1000);resFilled++;}
         var tv=meta.pt==='in'?(inTemp[meta.hour]):rec.temp;
         if(tv!=null)platSetNum(ws,exRow,12,Math.round(tv*100)/100);
         filled++;
@@ -4266,7 +4285,12 @@ function platGenerate(){
     var out=XLSX.write(tpl,{bookType:'xls',type:'array'});
     platBlobDownload(new Blob([out],{type:'application/vnd.ms-excel'}),'自动监测结果导入_'+date+'.xls');
     var w=[]; if(Object.keys(inD).length===0)w.push('进水口无数据'); if(Object.keys(outD).length===0)w.push('排污口无数据');
-    msg.textContent='已生成并下载：'+filled+' 行已填充（共72行）。'+(w.length?('⚠ '+w.join('、')+'，请核对文件表头。'):'上传前请随机抽几行核对。');
+    var abnAll={};
+    [inD._abn,outD._abn].forEach(function(o){if(!o)return;Object.keys(o).forEach(function(k){abnAll[k]=(abnAll[k]||0)+o[k];});});
+    var abnStr=Object.keys(abnAll).map(function(k){return k+' '+abnAll[k]+' 条';}).join('、');
+    msg.textContent='已生成并下载：模板 72 行中有数据 '+filled+' 行，监测结果已填 '+resFilled+' 行。'
+      +(abnStr?('其中设备标记为「'+abnStr+'」的时段已按平台原值填入（不再剔除）。'):'')
+      +(w.length?('⚠ '+w.join('、')+'，请核对文件表头。'):'上传前请随机抽几行核对。');
   }).catch(function(e){msg.textContent='生成失败：'+(e&&e.message||e);});
 }
 function renderPlat(){
