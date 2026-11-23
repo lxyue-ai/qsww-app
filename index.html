@@ -776,23 +776,40 @@ function periodSludge(a,b){
 }
 /* ===== 驾驶舱周期切换 ===== */
 var dashDim='month', dashSel=null;
+/* 合法年月：2026-11 / 2026-11-03 / 2026年11月 / 2026/11 → 2026-11；
+   脏数据（如台账里误录的 230-01-01、227-01-01）返回空，绝不污染下拉选项 */
+function ymOf(v){
+  if(v==null)return '';
+  var m=(''+v).trim().match(/^(20\d{2})[-年/.](\d{1,2})(?:[-月/.]|$)/);
+  if(!m)return '';
+  var mm=+m[2];
+  if(mm<1||mm>12)return '';
+  return m[1]+'-'+('0'+mm).slice(-2);
+}
+/* 驾驶舱周期显示文案：2026年11月 / 2026年第1季度 / 2026年度 */
+function dashLabel(mode,v){
+  if(!v)return '';
+  if(mode==='quarter'){var y=v.slice(0,4),q=v.slice(-1);return y+'年第'+q+'季度';}
+  if(mode==='year')return v+'年度';
+  var p=v.split('-');return p[0]+'年'+(+p[1])+'月';
+}
 function collectMonths(){
   var set={};
-  ['water','production','chemical','abnormal'].forEach(function(c){(DB.ledgers[c]||[]).forEach(function(r){var d=r.date||r.month||'';if(d.length>=7)set[d.slice(0,7)]=1;});});
-  getOvRecords().forEach(function(r){var d=r.date||'';if(d.length>=7)set[d.slice(0,7)]=1;});
-  DB.reports.forEach(function(r){if((r.date||'').length>=7)set[r.date.slice(0,7)]=1;});
-  getAbnRecords().forEach(function(r){if((r.date||'').length>=7)set[r.date.slice(0,7)]=1;});
-  getOvRecords().forEach(function(r){if((r.date||'').length>=7)set[r.date.slice(0,7)]=1;});
+  function add(v){var ym=ymOf(v);if(ym)set[ym]=1;}
+  ['water','production','chemical','abnormal'].forEach(function(c){(DB.ledgers[c]||[]).forEach(function(r){add(r.date||r.month);});});
+  getOvRecords().forEach(function(r){add(r.date);});
+  (DB.reports||[]).forEach(function(r){add(r.date);});
+  getAbnRecords().forEach(function(r){add(r.date);});
   var arr=Object.keys(set);arr.sort();return arr;
 }
 function fillDashSel(){
   var sel=document.getElementById('dashSelSel'),months=collectMonths(),opts=[],seen={},uniq=[];
-  if(dashDim==='month'){months.forEach(function(ym){opts.push({v:ym,t:ym+'月'});});}
-  else if(dashDim==='quarter'){months.forEach(function(ym){var q=ym.slice(0,4)+'年Q'+Math.ceil(+ym.slice(5,7)/3);opts.push({v:q,t:q});});}
-  else{months.forEach(function(ym){opts.push({v:ym.slice(0,4),t:ym.slice(0,4)+'年度'});});}
+  if(dashDim==='month'){months.forEach(function(ym){opts.push({v:ym,t:dashLabel('month',ym)});});}
+  else if(dashDim==='quarter'){months.forEach(function(ym){var q=ym.slice(0,4)+'Q'+Math.ceil(+ym.slice(5,7)/3);opts.push({v:q,t:dashLabel('quarter',q)});});}
+  else{months.forEach(function(ym){opts.push({v:ym.slice(0,4),t:dashLabel('year',ym.slice(0,4))});});}
   opts.forEach(function(o){if(!seen[o.v]){seen[o.v]=1;uniq.push(o);}});
   uniq.sort(function(a,b){return a.v<b.v?1:-1;});
-  if(!uniq.length)uniq=[{v:thisMonth(),t:thisMonth()+'月'}];
+  if(!uniq.length){var _d=thisMonth();uniq=[{v:_d,t:dashLabel('month',_d)}];}
   sel.innerHTML=uniq.map(function(o){return '<option value="'+o.v+'">'+o.t+'</option>';}).join('');
   if(!dashSel||!seen[dashSel])dashSel=uniq[0].v;
   sel.value=dashSel;
@@ -842,7 +859,7 @@ function renderHome(){
   fillDashSel();
   var range=dashRange(),a=range.a,b=range.b;
   var prefix=dashDim==='month'?'本月':dashDim==='quarter'?'本季度':'本年度';
-  document.getElementById('dashPeriod').textContent='（'+dashSel+'）';
+  document.getElementById('dashPeriod').textContent='（'+dashLabel(dashDim,dashSel)+'）';
   var mw=DB.ledgers.water.filter(function(r){return inRange(r.date,a,b);});
   var tin=sumRows(mw,'inflow'),tout=sumRows(mw,'outflow');
   var sk=periodSludge(a,b);
@@ -876,8 +893,8 @@ function renderHome(){
   document.getElementById('dashChem').innerHTML=ch;
   /* 进出水量柱状图（按维度动态粒度） */
   var series,ctitle;
-  if(dashDim==='month'){series=dashSeries(a,b,'day');ctitle=dashSel+' 每日进出水量（m³）';}
-  else{series=dashSeries(a,b,'month');ctitle=dashSel+' 各月进出水量（m³）';}
+  if(dashDim==='month'){series=dashSeries(a,b,'day');ctitle=dashLabel('month',dashSel)+' 每日进出水量（m³）';}
+  else{series=dashSeries(a,b,'month');ctitle=dashLabel(dashDim,dashSel)+' 各月进出水量（m³）';}
   renderBarChart(series,ctitle);
   renderDashSeg();
 }
