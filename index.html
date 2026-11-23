@@ -1070,7 +1070,7 @@ function monParseExcel(XLSX,buf){
   var flowCol=monFindCol(rows,3,'累计流量');
   var flowFlag=flowCol>=0?monFindCol(rows,3,'设备标记',flowCol):-1;
   var cols={flow:{val:flowCol,flag:flowFlag},cod:monMetricCols(rows,'化学需氧量'),nh3:monMetricCols(rows,'氨氮'),tn:monMetricCols(rows,'总氮'),tp:monMetricCols(rows,'总磷'),ph:monMetricCols(rows,'pH')};
-  var rec={point:point,date:'',flow:[],cod:[],nh3:[],tn:[],tp:[],ph:[],hours:0};
+  var rec={point:point,date:'',flow:[],cod:[],nh3:[],tn:[],tp:[],ph:[],hours:0,calib:0};
   for(var i=4;i<rows.length;i++){
     var row=rows[i];if(!row)continue;
     var hc=monHourCell(row[0]);if(!hc)continue;
@@ -1078,8 +1078,10 @@ function monParseExcel(XLSX,buf){
     rec.hours++;
     function grab(key){
       var mc=cols[key];if(!mc||mc.val<0)return;
-      /* 不再按“设备标记=数据有效”过滤：平台导出的「校准/故障」时段同样有有效读数，
-         过滤会把整点数据丢掉（每日上报/日均值同样受影响）。空值由 platToNum 统一返回 null */
+      /* 排污口测值：设备标记含「校准」的时段是仪器用标准液校准，不是真实水样，
+         不计入出口日均值/最高值/最低值（进水口不做此项剔除）。
+         pH 不走这里，无论什么标记都全部计入平均值。 */
+      if(point==='out'&&mc.flag>=0&&(''+row[mc.flag]).indexOf('校准')>=0){rec.calib++;return;}
       var v=platToNum(row[mc.val]);if(v!=null)rec[key].push(v);
     }
     grab('flow');grab('cod');grab('nh3');grab('tn');grab('tp');
@@ -1133,7 +1135,8 @@ function monCompute(){
       document.getElementById('r_date').value=date;
       checkMonitor();
       autoFillMonitor();
-      msg.innerHTML='✅ 已识别 '+date+'：进水 '+rin.hours+' 小时 / 出水 '+rout.hours+' 小时，已自动填写并生成上报文字和图片（出水按去最大值口径，有效值 '+rout.cod.length+' 个）。';
+      msg.innerHTML='✅ 已识别 '+date+'：进水 '+rin.hours+' 小时 / 出水 '+rout.hours+' 小时，已自动填写并生成上报文字和图片（出水有效值 '+rout.cod.length+' 个'
+        +(rout.calib?('，已剔除校准测值 '+rout.calib+' 个'):'')+'；pH 全部计入）。';
       genReport();
       genReportImage();
     }catch(err){console.error(err);msg.textContent='解析失败：'+(err&&err.message||err);}
